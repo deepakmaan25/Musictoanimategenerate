@@ -2086,7 +2086,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
           ctx.save();
           ctx.rotate((seg / segs) * Math.PI * 2 + solarTRef.current * 0.18);
           if (seg % 2 === 1) ctx.scale(-1, 1);
-          const bars = 28;
+          const bars = perf ? 24 : 48;
           const step = Math.floor(freq.length / bars);
           const c = liveColors[seg % liveColors.length];
           ctx.strokeStyle = c;
