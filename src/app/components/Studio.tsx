@@ -335,6 +335,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
   const isDraggingSeekRef = useRef(false);
   const seekBarRef = useRef<HTMLDivElement>(null); // for non-passive touchmove
   const freqBufRef = useRef<Uint8Array | null>(null);   // reused every frame — avoids GC pressure
+  const tdBufRef    = useRef<Uint8Array | null>(null);   // time-domain buffer reused for waveform underlay
   // ── Perf: cached per-frame values to avoid redundant computation ──────────
   const ctxRef            = useRef<CanvasRenderingContext2D | null>(null); // cached canvas context
   const liveColorsRef     = useRef<[string,string,string]>(['#8b5cf6','#ec4899','#f59e0b']);
@@ -717,13 +718,16 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
 
     // ── Spectrum Bars ─────────────────────────────────────────────────────
     if (eng === 'bars') {
-      const numBars = 80;
+      const numBars = 96;
       const step = Math.floor(freq.length / numBars);
       const barW = w / numBars;
 
       // Waveform underlay — all variants share this
-      const tdData = new Uint8Array(analyser.frequencyBinCount * 2);
-      analyser.getByteTimeDomainData(tdData);
+      if (!tdBufRef.current || tdBufRef.current.length !== analyser.frequencyBinCount * 2) {
+        tdBufRef.current = new Uint8Array(analyser.frequencyBinCount * 2);
+      }
+      analyser.getByteTimeDomainData(tdBufRef.current);
+      const tdData = tdBufRef.current;
       ctx.save();
       ctx.strokeStyle = `rgba(${hexToRgb(liveColors[1], hxCache)}, 0.18)`;
       ctx.lineWidth = 1.5;
@@ -839,14 +843,21 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
         ctx.globalAlpha = 1;
       } else {
         const midY = h / 2;
+        // Single gradient outside the loop — was 80 createLinearGradient calls/frame, now 1
+        let maxBh = 1;
+        for (let i = 0; i < numBars; i++) {
+          const bhi = (freq[i * step] / 255) * sens * energyMult * h * 0.36 * (0.4 + sectionIntensity * 0.6);
+          if (bhi > maxBh) maxBh = bhi;
+        }
+        const mirrorGrad = ctx.createLinearGradient(0, midY - maxBh, 0, midY + maxBh);
+        mirrorGrad.addColorStop(0,   liveColors[0]);
+        mirrorGrad.addColorStop(0.5, liveColors[1]);
+        mirrorGrad.addColorStop(1,   liveColors[2]);
+        ctx.fillStyle = mirrorGrad;
         for (let i = 0; i < numBars; i++) {
           const v = (freq[i * step] / 255) * sens * energyMult;
           const bh = v * h * 0.36 * (0.4 + sectionIntensity * 0.6);
-          const grad = ctx.createLinearGradient(0, midY - bh, 0, midY + bh);
-          grad.addColorStop(0, liveColors[0]);
-          grad.addColorStop(0.5, liveColors[1]);
-          grad.addColorStop(1, liveColors[2]);
-          ctx.fillStyle = grad;
+          if (bh < 1) continue;
           ctx.fillRect(i * barW + 2, midY - bh, barW - 4, bh * 2);
         }
         ctx.strokeStyle = `rgba(255,255,255,0.06)`;
@@ -859,7 +870,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
       const cx = w / 2, cy = h / 2;
       const minDim = Math.min(w, h);
       const baseR = minDim * 0.15;
-      const bars = 96;
+      const bars = 120;
       const step = Math.floor(freq.length / bars);
       const bass = avg(freq, 0, 8);
       const coreR = baseR * (1 + bass * sens * 0.6);
@@ -1071,7 +1082,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
         ctx.globalAlpha = 1; ctx.shadowBlur = 0;
 
       } else if (vrnt === 'helix') {        // ── Helix: stacked rings twist into a DNA double helix ──────────
-        const helixN = perf ? 9 : 16;
+        const helixN = perf ? 9 : 20;
         const bandH  = h / helixN;
         ctx.shadowBlur = 0;
         for (let i = 0; i < helixN; i++) {
@@ -1121,7 +1132,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
         const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 3);
         coreGrad.addColorStop(0, liveColors[0]); coreGrad.addColorStop(0.4, liveColors[1]); coreGrad.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = coreGrad; ctx.beginPath(); ctx.arc(cx, cy, coreR * 3, 0, Math.PI * 2); ctx.fill();
-        const ringCount = perf ? 3 : 6;
+        const ringCount = perf ? 3 : 8;
         for (let r = 0; r < ringCount; r++) {
           const baseR = Math.min(w, h) * (0.12 + r * 0.07) * (1 + bass * sens * 0.15) * (0.7 + sectionIntensity * 0.3);
           const thickness = (1.5 + mids * 6 * sens + r * 0.4) * energyMult;
@@ -1165,7 +1176,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
       ctx.fillRect(0, 0, w, h);
 
       const densityScale = 0.5 + sectionIntensity * 0.5;
-      const targetCount = Math.floor((perf ? 350 : 900) * densityScale * (0.35 + particleDensRef.current * 0.65));
+      const targetCount = Math.floor((perf ? 350 : 1100) * densityScale * (0.35 + particleDensRef.current * 0.65));
       while (starsRef.current.length < targetCount) {
         starsRef.current.push({ x: (Math.random() - 0.5) * 2, y: (Math.random() - 0.5) * 2, z: 0.15 + Math.random() * 0.85, hue: Math.random() });
       }
@@ -1357,7 +1368,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
       const elevBurst = smoothedBurstRef.current;
 
       cameraTRef.current += (0.016 + bass * 0.022 * sens) * energyMult;
-      const cols = perf ? 18 : 34, rows = perf ? 12 : 24;
+      const cols = perf ? 18 : 40, rows = perf ? 12 : 28;
       const horizon = h * (0.38 + sectionIntensity * 0.06); // horizon rises at drops
 
       // Sky gradient — skip for grid variant (flat canvas looks better)
@@ -1401,10 +1412,12 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
           }
 
           // Filled polygon
+          const depth   = 1 - t;
+          const c0      = liveColors[r % liveColors.length];
+          const c1      = liveColors[(r + 1) % liveColors.length];
           const fillGrad = ctx.createLinearGradient(0, yPersp - 200, 0, yPerspNext);
-          const depth = 1 - t;
-          fillGrad.addColorStop(0, `rgba(${hexToRgb(liveColors[r % liveColors.length], hxCache)}, ${0.55 + depth * 0.3})`);
-          fillGrad.addColorStop(1, `rgba(${hexToRgb(liveColors[(r + 1, hxCache) % liveColors.length])}, ${0.2 + depth * 0.2})`);
+          fillGrad.addColorStop(0, `rgba(${hexToRgb(c0, hxCache)}, ${0.55 + depth * 0.3})`);
+          fillGrad.addColorStop(1, `rgba(${hexToRgb(c1, hxCache)}, ${0.2 + depth * 0.2})`);
           ctx.fillStyle = fillGrad;
           ctx.beginPath();
           ctx.moveTo(0, yPerspNext);
@@ -1466,8 +1479,8 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
         }
       } else if (vrnt === 'ocean') {
         // ── Ocean: rolling fluid sine-wave surface from a side view ──────
-        const waveRows   = perf ? 6 : 11;
-        const waveSteps  = perf ? 60 : 120;
+        const waveRows   = perf ? 6 : 13;
+        const waveSteps  = perf ? 60 : 140;
         cameraTRef.current += (0.018 + bass * 0.028 * sens) * energyMult;
         const ot = cameraTRef.current;
 
@@ -1571,7 +1584,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
       const cx2 = w / 2;
 
       // Tunnel variant: circle/square still use tunnel engine but aurora ignores vrnt
-      const numRibbons = perf ? 5 : 9;
+      const numRibbons = perf ? 5 : 11;
 
       if (vrnt === 'vertical') {
         // ── Vertical: columns rising from the bottom ─────────────────────
@@ -1640,7 +1653,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
         ctx.shadowBlur = 0; ctx.globalAlpha = 1;
       } else if (vrnt === 'spiral') {
         // ── Spiral: vanishing-point rings collapsing inward ──────────────
-        const ringCount = perf ? 10 : 18;
+        const ringCount = perf ? 10 : 24;
         tunnelTRef.current += (0.012 + bass * 0.022 * sens) * energyMult;
         const speed = tunnelTRef.current;
         for (let i = 0; i < ringCount; i++) {
@@ -1677,7 +1690,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
 
       } else if (vrnt === 'wave') {
         // ── Wave: concentric sine rings ripple outward from centre ────────
-        const waveN   = perf ? 10 : 18;
+        const waveN   = perf ? 10 : 24;
         tunnelTRef.current += (0.014 + mids * 0.018 * sens) * energyMult;
         const wt = tunnelTRef.current;
         const cxw = w / 2, cyw = h / 2;
@@ -1728,7 +1741,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
         // ── Aurora (default): horizontal ribbons ─────────────────────────
         // OPTIMISED: paths stored in Float32Array (pre-computed once per frame);
         // gradients cached per color; fill reuses computed points; shadowBlur capped.
-        const steps = perf ? 36 : 60;  // was 80 — 60 is imperceptible at canvas size
+        const steps = perf ? 36 : 72;  // 72 gives smoother curves at full resolution
         const pts2  = steps + 1;
 
         // Resize path cache if ribbon count or step count changed
@@ -1901,14 +1914,14 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
         ctx.save();
         ctx.shadowColor = color;
         ctx.shadowBlur  = perf ? 0 : Math.min(24, (8 + be * 20 * sens) * (0.6 + sectionIntensity * 0.4));
-        const g = ctx.createRadialGradient(sx - r * 0.3, sy - r * 0.3, 0, sx, sy, r * 1.8);
-        g.addColorStop(0, '#ffffff');
-        g.addColorStop(0.15, color);
-        g.addColorStop(0.5, `rgba(${hexToRgb(color, hxCache)}, 0.5)`);
-        g.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.globalAlpha = (0.65 + be * 0.35) * (0.7 + sectionIntensity * 0.3);
-        ctx.fillStyle   = g;
-        ctx.beginPath(); ctx.arc(sx, sy, r * 1.8, 0, Math.PI * 2); ctx.fill();
+        // Outer glow layer (no radial gradient — uses shadowBlur which is already set)
+        ctx.globalAlpha = (0.45 + be * 0.35) * (0.6 + sectionIntensity * 0.4);
+        ctx.fillStyle   = color;
+        ctx.beginPath(); ctx.arc(sx, sy, r * 1.6, 0, Math.PI * 2); ctx.fill();
+        // Bright core highlight
+        ctx.globalAlpha = (0.75 + be * 0.25) * (0.7 + sectionIntensity * 0.3);
+        ctx.fillStyle   = '#ffffff';
+        ctx.beginPath(); ctx.arc(sx - r * 0.28, sy - r * 0.28, r * 0.22, 0, Math.PI * 2); ctx.fill();
 
         // Specular highlight
         if (highs > 0.3 && Math.random() < highs * 0.35) {
@@ -1950,7 +1963,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
 
       if (vrnt === 'mandala') {
         // ── Mandala: organic petal bloom, beat-reactive ──────────────────
-        const petalN = perf ? 8 : 14;
+        const petalN = perf ? 8 : 18;
         const rot    = solarTRef.current * 0.09;
         ctx.save();
         ctx.translate(cx, cy);
@@ -2006,7 +2019,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
 
       } else if (vrnt === 'crystal') {
         // ── Crystal: angular shards refract and rotate with the beat ─────
-        const shardN = perf ? 8 : 14;
+        const shardN = perf ? 8 : 18;
         const cRot   = solarTRef.current * 0.14;
         ctx.save();
         ctx.translate(cx, cy);
@@ -2029,11 +2042,8 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
             const bx2 = Math.cos(ang - Math.PI / 2) * width;
             const by2 = Math.sin(ang - Math.PI / 2) * width;
             // Facet: triangle shard
-            const sGrad = ctx.createLinearGradient(0, 0, tx, ty);
-            sGrad.addColorStop(0,   `rgba(${hexToRgb(color, hxCache)}, ${0.08 + v * 0.12})`);
-            sGrad.addColorStop(0.6, `rgba(${hexToRgb(color, hxCache)}, ${0.25 + v * 0.35})`);
-            sGrad.addColorStop(1,   `rgba(${hexToRgb(color, hxCache)}, ${0.04})`);
-            ctx.fillStyle   = sGrad;
+            // Flat fill (was 36 createLinearGradient calls/frame — fill opacity is subtle anyway)
+            ctx.fillStyle   = `rgba(${hexToRgb(color, hxCache)}, ${0.18 + v * 0.28})`;
             ctx.globalAlpha = 0.55 + v * 0.45;
             ctx.shadowColor = color; ctx.shadowBlur = 6 + v * 18;
             ctx.beginPath();
@@ -2487,7 +2497,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
       const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
       if (audioBuffer.duration < 1) throw new Error('Audio is too short.');
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = 1024;
+      analyser.fftSize = 2048;
       analyser.smoothingTimeConstant = smoothing;
       analyserRef.current = analyser;
       const gain = ctx.createGain();
@@ -2958,6 +2968,15 @@ if (dbExports.length > 0) {
     if (ctx.state === 'suspended') await ctx.resume();
     if (sourceRef.current) { try { sourceRef.current.stop(); } catch {} sourceRef.current.disconnect(); }
 
+    // Resize canvas to actual export resolution — preview renders at ~432px, export must be full preset size
+    const exportCanvas = canvasRef.current!;
+    const prevCanvasW  = exportCanvas.width;
+    const prevCanvasH  = exportCanvas.height;
+    const prevPerfMode = perfModeRef.current;
+    exportCanvas.width  = preset.w;
+    exportCanvas.height = preset.h;
+    perfModeRef.current = false; // always full quality during export
+
     const dest = ctx.createMediaStreamDestination();
     const src  = ctx.createBufferSource();
     src.buffer = project.audioBuffer;
@@ -2985,7 +3004,8 @@ if (dbExports.length > 0) {
     try {
       recorder = new MediaRecorder(mixed, {
         mimeType,
-        videoBitsPerSecond: preset.id === 'pro' ? 16_000_000 : preset.id === 'std' ? 8_000_000 : 4_000_000,
+        videoBitsPerSecond: preset.id === 'pro' ? 30_000_000 : preset.id === 'std' ? 15_000_000 : 6_000_000,
+        audioBitsPerSecond: 320_000,
       });
     } catch (err) {
       console.error('MediaRecorder init failed:', err);
@@ -3010,6 +3030,8 @@ if (dbExports.length > 0) {
        recorder.onstop = () => {
       // If cancelled, discard blob and mark as error
       if (exportCancelRef.current) {
+        exportCanvas.width = prevCanvasW; exportCanvas.height = prevCanvasH;
+        perfModeRef.current = prevPerfMode;
         setExports((x) => x.filter((j) => j.id !== job.id));
         exportCancelRef.current = false;
         return;
@@ -3017,6 +3039,9 @@ if (dbExports.length > 0) {
 
       const ext  = exportMode === 'mp4' ? 'mp4' : 'webm';
       const type = exportMode === 'mp4' ? 'video/mp4' : 'video/webm';
+      // Restore canvas to preview resolution after successful export
+      exportCanvas.width = prevCanvasW; exportCanvas.height = prevCanvasH;
+      perfModeRef.current = prevPerfMode;
       const blob = new Blob(chunks, { type });
       const url  = URL.createObjectURL(blob);
  
