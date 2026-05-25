@@ -1,0 +1,2 @@
+grep -rn "getContext('2d')" src/ --include="*.ts" --include="*.tsx"
+grep -rn "getImageData" src/ --include="*.ts" --include="*.tsx"
