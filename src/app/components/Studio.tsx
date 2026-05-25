@@ -290,7 +290,8 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
   const crossfadeRef     = useRef<ImageData | null>(null);
   const crossfadeAlpha   = useRef(0);   // 0=done, 1=start of fade
 
-  const exportCancelRef = useRef(false);  // set true to abort a running export
+  const exportCancelRef = useRef(false);  // set true to abort a running export   
+  const exportIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Live section state for React overlay (updated from RAF, not canvas)
   const [activeSectionLabel, setActiveSectionLabel] = useState<string | null>(null);
@@ -437,7 +438,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
     // Capture current frame for crossfade before the engine switches
     const canvas = canvasRef.current;
     if (canvas) {
-      const ctx = ctxRef.current ?? canvas.getContext('2d');
+      const ctx = ctxRef.current ?? canvas.getContext('2d', { alpha: false, willReadFrequently: true });
       if (ctx) {
         try { crossfadeRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height); } catch { /* ignore */ }
         crossfadeAlpha.current = 1;
@@ -559,10 +560,11 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
   }, [engine, palette, beatSensitivity, particleDensity, smoothing, persistedId, project?.fileName, supabaseSync]);
   
 
-  // ── Redraw static frame when params change ─────────────────────────────────
-  // (runs AFTER sync effects above, so refs are already up-to-date)
+ // ── Redraw static frame when params change ─────────────────────────────────
+  // Guard: skip when playing — the RAF loop already renders every frame.
+  // Only fire when paused so slider/engine changes update the frozen preview.
   useEffect(() => {
-    drawFrame();
+    if (!playingRef.current) drawFrame();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, palette, beatSensitivity, particleDensity, project, aspect, perfMode, baseSpeed, beatResponse]);
 
@@ -577,8 +579,14 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
     if (!ctxRef.current || ctxRef.current.canvas !== canvas) {
       ctxRef.current = canvas.getContext('2d', { alpha: false, willReadFrequently: true }) ?? null;
     }
-    const ctx = ctxRef.current;
+   const ctx = ctxRef.current;
     if (!ctx) return;
+
+    // Reset state that any engine may have left dirty — prevents bleed on switch
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     const eng     = engineRef.current;
     const vrnt    = variantRef.current;
@@ -2990,7 +2998,15 @@ if (dbExports.length > 0) {
     setPlaying(true);
     runVisualizationLoop();
 
-    const canvasStream = canvasRef.current.captureStream(preset.fps);
+  // Feature-detect requestFrame (Chrome/Edge only — not Firefox/Safari)
+    // captureStream(0) = manual frame control; captureStream(fps) = timed fallback
+    const _testCanvas = document.createElement('canvas');
+    const _testTrack = _testCanvas.captureStream(0).getVideoTracks()[0] as any;
+    const supportsRequestFrame = typeof _testTrack?.requestFrame === 'function';
+    _testTrack?.stop();
+
+    const canvasStream = canvasRef.current!.captureStream(supportsRequestFrame ? 0 : preset.fps);
+    const videoTrack = canvasStream.getVideoTracks()[0] as any;
     const mixed = new MediaStream([...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
 
     // Choose mimeType: MP4 on iOS Safari if supported, WebM elsewhere
@@ -3028,6 +3044,11 @@ if (dbExports.length > 0) {
     };
        exportCancelRef.current = false; // reset before starting
        recorder.onstop = () => {
+      // Clear export interval if still running (e.g. stopped externally)
+      if (exportIntervalRef.current) {
+        clearInterval(exportIntervalRef.current);
+        exportIntervalRef.current = null;
+      }
       // If cancelled, discard blob and mark as error
       if (exportCancelRef.current) {
         exportCanvas.width = prevCanvasW; exportCanvas.height = prevCanvasH;
@@ -3076,24 +3097,61 @@ if (dbExports.length > 0) {
       }
     };
     
-    recorder.start(200);
+recorder.start(200);
 
     const startedAt = performance.now();
-    const tick = () => {
-      const elapsed = (performance.now() - startedAt) / 1000;
-      const pct = Math.min(100, (elapsed / dur) * 100);
-      setExports((x) => x.map((j) => j.id === job.id ? { ...j, progress: pct } : j));
-      if (elapsed >= dur) {
-        setExports((x) => x.map((j) => j.id === job.id ? { ...j, status: 'finalizing', progress: 100 } : j));
-        recorder.stop();
-        try { src.stop(); } catch {}
-        playingRef.current = false; setPlaying(false);
-        return;
-      }
+    const frameMs = 1000 / preset.fps;
+
+    if (supportsRequestFrame) {
+      // ── Frame-accurate path (Chrome / Edge) ───────────────────────────────
+      // setInterval renders + commits every frame at the exact target fps.
+      // No rAF loop competing for GPU — eliminates the stutter/lag entirely.
+      exportIntervalRef.current = setInterval(() => {
+        const elapsed = (performance.now() - startedAt) / 1000;
+
+        if (exportCancelRef.current || elapsed >= dur) {
+          clearInterval(exportIntervalRef.current!);
+          exportIntervalRef.current = null;
+          if (!exportCancelRef.current) {
+            setExports((x) => x.map((j) =>
+              j.id === job.id ? { ...j, status: 'finalizing', progress: 100 } : j));
+            recorder.stop();
+            try { src.stop(); } catch {}
+            playingRef.current = false; setPlaying(false);
+          }
+          return;
+        }
+
+        // Render the frame then immediately commit it to the recording stream
+        drawFrame();
+        videoTrack.requestFrame();
+
+        const pct = Math.min(100, (elapsed / dur) * 100);
+        setExports((x) => x.map((j) => j.id === job.id ? { ...j, progress: pct } : j));
+      }, frameMs);
+
+    } else {
+      // ── Fallback path (Firefox / Safari) ─────────────────────────────────
+      // captureStream(fps) samples asynchronously — imperfect but unavoidable
+      // without requestFrame support. Keep existing rAF approach for these browsers.
+      runVisualizationLoop();
+      const tick = () => {
+        const elapsed = (performance.now() - startedAt) / 1000;
+        const pct = Math.min(100, (elapsed / dur) * 100);
+        setExports((x) => x.map((j) => j.id === job.id ? { ...j, progress: pct } : j));
+        if (elapsed >= dur) {
+          setExports((x) => x.map((j) =>
+            j.id === job.id ? { ...j, status: 'finalizing', progress: 100 } : j));
+          recorder.stop();
+          try { src.stop(); } catch {}
+          playingRef.current = false; setPlaying(false);
+          return;
+        }
+        requestAnimationFrame(tick);
+      };
       requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  };   
+    }
+  };
 
   // ─────────────────────────────────────────────────────────────────────────
   // Export management
@@ -4088,8 +4146,12 @@ if (dbExports.length > 0) {
                           {(j.status === 'recording' || j.status === 'finalizing') && (
                             <Button size="sm" variant="outline"
                               className="w-full h-7 text-xs border-red-500/30 text-red-400 hover:bg-red-500/10 mb-2"
-                              onClick={() => {
+                            onClick={() => {
                                 exportCancelRef.current = true;
+                                if (exportIntervalRef.current) {
+                                  clearInterval(exportIntervalRef.current);
+                                  exportIntervalRef.current = null;
+                                }
                                 recorderRef.current?.stop();
                               }}>
                               Cancel export
