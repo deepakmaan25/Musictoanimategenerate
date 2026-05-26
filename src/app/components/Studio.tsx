@@ -2998,16 +2998,20 @@ if (dbExports.length > 0) {
     setPlaying(true);
     runVisualizationLoop();
 
-  // Feature-detect requestFrame (Chrome/Edge only — not Firefox/Safari)
-    // captureStream(0) = manual frame control; captureStream(fps) = timed fallback
-    const _testCanvas = document.createElement('canvas');
-    const _testTrack = _testCanvas.captureStream(0).getVideoTracks()[0] as any;
-    const supportsRequestFrame = typeof _testTrack?.requestFrame === 'function';
-    _testTrack?.stop();
-
-    const canvasStream = canvasRef.current!.captureStream(supportsRequestFrame ? 0 : preset.fps);
+  // Detect requestFrame directly on the real canvas stream — no throwaway canvas needed.
+    // captureStream(0) gives manual control; we check if the track supports requestFrame.
+    // If not (Firefox/Safari), stop it and recreate at target fps for the timed fallback.
+    const canvasStream = canvasRef.current!.captureStream(0);
     const videoTrack = canvasStream.getVideoTracks()[0] as any;
-    const mixed = new MediaStream([...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+    const supportsRequestFrame = typeof videoTrack?.requestFrame === 'function';
+
+    const finalStream = supportsRequestFrame
+      ? canvasStream
+      : (() => {
+          canvasStream.getVideoTracks().forEach(t => t.stop());
+          return canvasRef.current!.captureStream(preset.fps);
+        })();
+    const mixed = new MediaStream([...finalStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
 
     // Choose mimeType: MP4 on iOS Safari if supported, WebM elsewhere
     const mimeType = exportMode === 'mp4'
@@ -3124,7 +3128,7 @@ recorder.start(200);
 
         // Render the frame then immediately commit it to the recording stream
         drawFrame();
-        videoTrack.requestFrame();
+        (finalStream.getVideoTracks()[0] as any).requestFrame();
 
         const pct = Math.min(100, (elapsed / dur) * 100);
         setExports((x) => x.map((j) => j.id === job.id ? { ...j, progress: pct } : j));
