@@ -30,7 +30,6 @@ const ENGINES: {
   { id: 'orbital_rings', studio: 'orbital', previewStyle: 'rings', name: 'Orbital Rings', icon: <Layers className="size-4" />, description: 'Concentric rings tilt and pulse around a neon core.', moods: ['Dreamy', 'Futuristic'], gradient: 'linear-gradient(135deg, #a855f7 0%, #3b82f6 100%)' },
   { id: 'neon_spheres', studio: 'neon_spheres', previewStyle: 'spheres', name: 'Neon Spheres', icon: <Sparkles className="size-4" />, description: 'Glowing spheres wobbling with each frequency band.', moods: ['Dreamy', 'Vocal-Heavy'], gradient: 'linear-gradient(135deg, #ec4899 0%, #f59e0b 100%)' },
   { id: 'fractal_kaleido', studio: 'fractal', previewStyle: 'fractal', name: 'Kaleidoscope', icon: <Palette className="size-4" />, description: 'Mirrored fractal patterns synced to music energy.', moods: ['Trippy', 'Instrumental'], gradient: 'linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%)' },
-  { id: 'solar_system',   studio: 'solar',       previewStyle: 'solar',     name: 'Geometric Pulse',  icon: <Zap className="size-4" />,     description: 'Concentric beat-rings expand and shatter on every drop.', moods: ['High-Energy', 'Aggressive'], gradient: 'linear-gradient(135deg, #f59e0b 0%, #ec4899 100%)' },
 ];
 
 const PROJECTS_PER_PAGE = 6;
@@ -230,7 +229,7 @@ function LandingApp() {
             <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-[-0.04em] mb-6 leading-[0.9]"
               style={{ color: 'var(--text-strong)' }}>
               Your sound,<br />
-              <span className="bg-clip-text text-transparent" style={{ backgroundImage: 'var(--hero-cta-gradient)' }}>
+              <span className="bg-clip-text text-transparent" style={{ backgroundImage: 'var(--hero-text-gradient)' }}>
                 visualized.
               </span>
             </h1>
@@ -363,7 +362,7 @@ function LandingApp() {
                   style={{ background: 'var(--surface-elevated)', borderColor: 'var(--surface-glass-border)' }}>
                   <div className="flex items-start justify-between mb-5">
                     <div className="size-10 rounded-xl flex items-center justify-center"
-                      style={{ background: 'var(--surface-glass)', color: 'var(--text-strong)' }}>
+                      style={{ background: 'var(--step-icon-bg)', color: 'var(--step-icon-color)' }}>
                       {step.icon}
                     </div>
                     <span className="text-3xl font-black tabular-nums select-none"
@@ -406,11 +405,11 @@ function LandingApp() {
           style={{ color: 'var(--text-muted)' }}>
           <div className="flex items-center gap-2">
             <div className="size-4 rounded" style={{ background: 'var(--hero-cta-gradient)' }} />
-            © 2026 Visualizer
+            © 2026 Music Animate
           </div>
           <div className="flex gap-5">
-            <span className="cursor-pointer hover:opacity-80">Privacy</span>
-            <span className="cursor-pointer hover:opacity-80">Terms</span>
+            <a href="/privacy" className="hover:opacity-80 transition-opacity">Privacy</a>
+            <a href="/terms" className="hover:opacity-80 transition-opacity">Terms</a>
           </div>
         </div>
       </footer>
@@ -441,7 +440,7 @@ function ProjectCard({ project, isSynced, onOpen, onRename, onDelete }: {
 
   return (
     <div className="rounded-2xl border overflow-hidden transition-all hover:translate-y-[-2px] hover:shadow-lg"
-      style={{ background: 'var(--surface-elevated)', borderColor: 'var(--surface-glass-border)' }}>
+      style={{ background: 'var(--surface-elevated)', borderColor: 'var(--surface-card-border, var(--surface-glass-border))' }}>
       {/* Engine gradient header bar */}
       <div className="h-1 w-full" style={{ background: engine.gradient }} />
 
@@ -518,12 +517,8 @@ function ProjectCard({ project, isSynced, onOpen, onRename, onDelete }: {
 
         {/* Primary action — secondary style, not full gradient */}
         <button onClick={onOpen}
-          className="w-full h-9 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-90 active:opacity-80 border"
-          style={{
-            background: 'var(--btn-secondary-bg)',
-            borderColor: 'var(--btn-secondary-border)',
-            color: 'var(--btn-secondary-text)',
-          }}>
+          className="w-full h-9 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-90 active:opacity-80 text-white"
+          style={{ background: 'var(--hero-cta-gradient)', boxShadow: '0 2px 12px -4px rgba(124,58,237,0.4)' }}>
           <ExternalLink className="size-3.5" /> Open project
         </button>
       </div>
@@ -549,13 +544,13 @@ function EngineCard({ engine, onUse }: { engine: typeof ENGINES[number]; onUse: 
         <p className="text-xs leading-relaxed line-clamp-1 mb-2" style={{ color: 'var(--text-muted)' }}>{engine.description}</p>
         <div className="flex gap-1">
           {engine.moods.map(m => (
-            <span key={m} className="text-[10px] px-1.5 py-0.5 rounded"
-              style={{ background: 'rgba(168,85,247,0.12)', color: 'rgb(168,85,247)' }}>{m}</span>
+            <span key={m} className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+              style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.65)' }}>{m}</span>
           ))}
         </div>
       </div>
-      <span className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-xs font-semibold text-white px-3 h-7 rounded-lg flex items-center"
-        style={{ background: 'var(--hero-cta-gradient)' }}>Use</span>
+      <span className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 text-xs font-semibold text-white px-3 h-7 rounded-lg flex items-center whitespace-nowrap"
+        style={{ background: engine.gradient }}>Use</span>
     </button>
   );
 }
