@@ -59,16 +59,19 @@ type Project = {
 
 type ExportJob = {
   id: number;
-  storageId?: string;    // original DB/export ID (string) for delete + cloud download
-  storagePath?: string;  // Supabase storage path for re-downloading from cloud
+  storageId?: string;
+  storagePath?: string;
   name: string;
+  trackName?: string;
+  engineId?: EngineId;
   preset: string;
   aspect: string;
-  status: 'recording' | 'finalizing' | 'done' | 'error';
+  status: 'recording' | 'finalizing' | 'done' | 'downloading' | 'error';
   progress: number;
   url?: string;
   blob?: Blob;
   size?: number;
+  thumbnail?: string;
   errorMsg?: string;
 };
 
@@ -2707,6 +2710,7 @@ if (dbExports.length > 0) {
           storageId: e.id,
           storagePath: e.storage_path,
           name: `${track.filename.replace(/\.[^.]+$/, '')}_${e.aspect_ratio?.replace(':', 'x') ?? ''}_${e.quality_preset ?? ''}`,
+          trackName: track.filename.replace(/\.[^.]+$/, ''),
           preset: e.quality_preset ?? '',
           aspect: e.aspect_ratio ?? '9:16',
           status: 'done' as const,
@@ -2949,6 +2953,8 @@ if (dbExports.length > 0) {
     const job: ExportJob = {
       id: Date.now(),
       name: `${trackName} · ${aspectLabel} · ${preset.name}`,
+      trackName,
+      engineId: engine,
       preset: preset.name, aspect, status: 'recording', progress: 0,
     };
     setExports((x) => [...x, job]);
@@ -3064,20 +3070,30 @@ if (dbExports.length > 0) {
 
       const ext  = exportMode === 'mp4' ? 'mp4' : 'webm';
       const type = exportMode === 'mp4' ? 'video/mp4' : 'video/webm';
+
+      // PATCH 3: capture poster frame BEFORE resizing canvas back to preview
+      let posterDataUrl: string | undefined;
+      try { posterDataUrl = exportCanvas.toDataURL('image/jpeg', 0.55); } catch { /* cross-origin — skip */ }
+
       // Restore canvas to preview resolution after successful export
       exportCanvas.width = prevCanvasW; exportCanvas.height = prevCanvasH;
       perfModeRef.current = prevPerfMode;
       const blob = new Blob(chunks, { type });
       const url  = URL.createObjectURL(blob);
- 
+
       setExports((x) =>
         x.map((j) =>
-          j.id === job.id ? { ...j, status: 'done', progress: 100, url, blob, size: blob.size } : j
+          j.id === job.id ? { ...j, status: 'done', progress: 100, url, blob, size: blob.size, thumbnail: posterDataUrl } : j
         )
       );
       // Auto-switch to History tab so user immediately sees the download button
       setActiveTab('exports');
- 
+      // Brief ring-flash on History tab to confirm export completion
+      setTimeout(() => {
+        const el = document.querySelector('[data-value="exports"]');
+        if (el) { el.classList.add('ring-1', 'ring-emerald-400/60'); setTimeout(() => el.classList.remove('ring-1','ring-emerald-400/60'), 1800); }
+      }, 120);
+
       // Local persist (existing)
       if (persist && persistedId) {
         persist.updateExport(persistedId, String(job.id), { status: 'ready', sizeBytes: blob.size });
@@ -3168,13 +3184,13 @@ recorder.start(200);
 
   const downloadCloudExport = async (job: ExportJob) => {
     if (!job.storagePath) return;
-    setExports((x) => x.map((j) => j.id === job.id ? { ...j, status: 'recording' } : j)); // show loading
+    setExports((x) => x.map((j) => j.id === job.id ? { ...j, status: 'downloading' } : j));
     const url = await getExportSignedUrl(job.storagePath, 3600);
     if (url) {
       const a = document.createElement('a');
       a.href = url;
       const ext = job.storagePath.endsWith('.mp4') ? 'mp4' : 'webm';
-      a.download = `${job.name}.${ext}`;
+      a.download = `${job.trackName ?? job.name}.${ext}`;
       a.click();
     }
     setExports((x) => x.map((j) => j.id === job.id ? { ...j, status: 'done' } : j));
@@ -3222,7 +3238,11 @@ recorder.start(200);
               )}
             </div>
             <div className="text-[11px] text-gray-400 truncate">
-              {project ? `${fmt(project.duration)} · ${ENGINES.find((e) => e.id === engine)!.name}` : 'No track loaded'}
+              {project ? (
+                <span>
+                  {fmt(project.duration)} · <span className={ENGINE_COLORS[engine]?.text ?? 'text-gray-400'}>{ENGINES.find((e) => e.id === engine)!.name}</span>
+                </span>
+              ) : 'No track loaded'}
             </div>
           </div>
         </div>
@@ -3257,13 +3277,13 @@ recorder.start(200);
                height: isFullscreen ? '100%' : (
                  // Desktop: no inline height — CSS flex handles it
                  typeof window !== 'undefined' && window.innerWidth >= 1024 ? undefined :
-                 // Mobile fixed heights
-                 // 9:16  reduced by 20% from 70vh/476px
-                 // 1:1   ×2 of original
-                 // 16:9  ×2 of original
-                 aspect === '9:16' ? 'min(56vh, 380px)'
-                 : aspect === '1:1' ? 'min(100vw, 520px)'
-                 : 'min(92vw, 560px)'
+                 // Mobile: use dvh so the canvas fills real visible viewport (avoids address bar cutoff)
+                 // 9:16 gets 72% — tall enough to feel immersive, leaves room for transport
+                 // 1:1  gets natural square via vw cap
+                 // 16:9 gets a wide bar
+                 aspect === '9:16' ? 'min(72dvh, 72vh, 480px)'
+                 : aspect === '1:1' ? 'min(88vw, 420px)'
+                 : 'min(96vw, 520px)'
                ),
              }}>
  
@@ -3283,9 +3303,18 @@ recorder.start(200);
             <AnimatePresence>
               {status === 'decoding' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-10 bg-black/80 flex flex-col items-center justify-center gap-3">
-                  <Loader2 className="size-7 animate-spin text-purple-400" />
-                  <div className="text-sm">Analyzing audio…</div>
+                  className="absolute inset-0 z-10 bg-black/85 flex flex-col items-center justify-center gap-4 px-6">
+                  {/* Animated waveform bars skeleton */}
+                  <div className="flex items-end gap-1 h-10">
+                    {[0.4, 0.7, 1.0, 0.6, 0.9, 0.5, 0.8, 0.4, 0.7, 1.0, 0.5].map((h, i) => (
+                      <div key={i} className="w-1.5 rounded-full bg-purple-400/60 animate-pulse"
+                        style={{ height: `${h * 100}%`, animationDelay: `${i * 80}ms` }} />
+                    ))}
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm font-semibold text-white">Analyzing audio</div>
+                    <div className="text-[11px] text-gray-400 mt-1">Detecting BPM, mood, and drop points…</div>
+                  </div>
                 </motion.div>
               )}
               {status === 'error' && (
@@ -3326,10 +3355,11 @@ recorder.start(200);
             {status === 'ready' && activeSectionLabel && (
               <div className="absolute top-2 left-2 flex items-center gap-1.5 pointer-events-none">
                 <span className={`text-[10px] font-bold tracking-widest px-2 py-0.5 rounded uppercase ${
-                  activeSectionLabel === 'drop'      ? 'bg-amber-500/25 text-amber-300' :
-                  activeSectionLabel === 'chorus'    ? 'bg-purple-500/25 text-purple-300' :
-                  activeSectionLabel === 'breakdown' ? 'bg-blue-500/20 text-blue-300' :
-                  'bg-white/10 text-white/50'
+                  activeSectionLabel === 'drop'      ? 'bg-amber-500/25 text-amber-200 border border-amber-400/25' :
+                  activeSectionLabel === 'chorus'    ? 'bg-violet-500/25 text-violet-200 border border-violet-400/25' :
+                  activeSectionLabel === 'breakdown' ? 'bg-blue-500/20 text-blue-200 border border-blue-400/20' :
+                  activeSectionLabel === 'verse'     ? 'bg-white/10 text-white/60 border border-white/10' :
+                  'bg-white/8 text-white/40 border border-white/8'
                 }`}>{activeSectionLabel}</span>
                 <span className="text-[10px] text-white/30 tabular-nums">{liveEnergy}%</span>
               </div>
@@ -3718,7 +3748,13 @@ recorder.start(200);
                       <span>✦</span> Recommended for this track
                       {trackAnalysis && (
                         <span className="ml-auto text-gray-500 normal-case tracking-normal">
-                          {trackAnalysis.bpm} BPM · {trackAnalysis.mood}
+                          {trackAnalysis.bpm} BPM · <span className={`capitalize font-medium ${
+                            trackAnalysis.mood === 'energetic' || trackAnalysis.mood === 'powerful' ? 'text-amber-300' :
+                            trackAnalysis.mood === 'melancholic' || trackAnalysis.mood === 'dreamy' ? 'text-blue-300' :
+                            trackAnalysis.mood === 'dark' ? 'text-red-400' :
+                            trackAnalysis.mood === 'euphoric' || trackAnalysis.mood === 'uplifting' ? 'text-emerald-300' :
+                            'text-purple-300'
+                          }`}>{trackAnalysis.mood}</span>
                         </span>
                       )}
                     </div>
@@ -3732,8 +3768,8 @@ recorder.start(200);
                             onClick={() => setEngine(rec.engineId)}
                             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${
                               engine === rec.engineId
-                                ? 'bg-purple-500/30 border-purple-400/60 text-purple-100'
-                                : 'bg-purple-500/10 border-purple-400/20 text-purple-300 hover:bg-purple-500/20'
+                                ? `${ENGINE_COLORS[rec.engineId]?.bg ?? 'bg-purple-500/30'} ${ENGINE_COLORS[rec.engineId]?.border ?? 'border-purple-400/60'} ${ENGINE_COLORS[rec.engineId]?.text ?? 'text-purple-100'}`
+                                : `${ENGINE_COLORS[rec.engineId]?.chip ?? 'bg-purple-500/10'} border-white/10 ${ENGINE_COLORS[rec.engineId]?.chipText ?? 'text-purple-300'} hover:opacity-80`
                             }`}
                           >
                             {engineName}
@@ -3858,7 +3894,7 @@ recorder.start(200);
                                     title={v.description}
                                     className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all ${
                                       active
-                                        ? 'bg-purple-500/25 border-purple-400/50 text-purple-200'
+                                        ? `${ENGINE_COLORS[e.id]?.chip ?? 'bg-purple-500/25'} ${ENGINE_COLORS[e.id]?.chipBorder ?? 'border-purple-400/50'} ${ENGINE_COLORS[e.id]?.chipText ?? 'text-purple-200'}`
                                         : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-gray-200'
                                     }`}
                                   >
@@ -3989,9 +4025,13 @@ recorder.start(200);
                   <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                     {ASPECTS.map((a) => (
                       <button key={a.id} onClick={() => setAspect(a.id)}
-                        className={`p-2 rounded-lg border text-left ${aspect === a.id ? 'bg-white text-gray-900 border-white' : 'bg-white/5 border-white/15 hover:bg-white/10'}`}>
-                        <div className="font-semibold text-xs">{a.label}</div>
-                        <div className="text-[10px] opacity-70 hidden sm:block">{a.sub}</div>
+                        className={`p-2 rounded-lg border text-left transition-colors ${
+                          aspect === a.id
+                            ? `${ENGINE_COLORS[engine]?.bg ?? 'bg-white/10'} ${ENGINE_COLORS[engine]?.border ?? 'border-white/40'}`
+                            : 'bg-white/5 border-white/15 hover:bg-white/10'
+                        }`}>
+                        <div className={`font-semibold text-xs ${aspect === a.id ? (ENGINE_COLORS[engine]?.text ?? 'text-white') : 'text-white'}`}>{a.label}</div>
+                        <div className={`text-[10px] ${aspect === a.id ? 'opacity-70' : 'opacity-50'}`}>{a.sub}</div>
                       </button>
                     ))}
                   </div>
@@ -4028,29 +4068,40 @@ recorder.start(200);
                   <div className="space-y-1.5">
                     {PRESETS.map((p) => (
                       <button key={p.id} onClick={() => setPresetId(p.id)}
-                        className={`w-full text-left p-2.5 rounded-lg border text-xs ${presetId === p.id ? 'bg-white/15 border-white/40 ring-1 ring-white/30' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}>
-                        <div className="font-semibold">{p.name}</div>
-                        <div className="text-gray-400 text-[11px]">{p.label}</div>
+                        className={`w-full text-left p-2.5 rounded-lg border text-xs transition-colors ${presetId === p.id ? 'bg-white/15 border-white/40 ring-1 ring-white/30' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <Zap className={`size-3 shrink-0 ${p.id === 'pro' ? 'text-amber-400' : p.id === 'std' ? 'text-purple-400' : 'text-emerald-400'}`} />
+                            <span className="font-semibold">{p.name}</span>
+                            {p.id === 'std' && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/25 text-purple-300 font-bold tracking-wide">Recommended</span>}
+                          </div>
+                          {presetId === p.id && <Check className="size-3 text-white shrink-0" />}
+                        </div>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <span className="text-gray-400 text-[11px]">{p.label}</span>
+                          <span className="text-gray-500 text-[10px]">
+                            ~{Math.round(((p.id === 'pro' ? 30_000_000 : p.id === 'std' ? 15_000_000 : 6_000_000) * Math.min(project?.duration ?? 30, clipDuration === 'full' ? (project?.duration ?? 30) : (clipDuration as number))) / 8 / 1024 / 1024 + 0.04 * Math.min(project?.duration ?? 30, clipDuration === 'full' ? (project?.duration ?? 30) : (clipDuration as number)) / 1024 / 1024)}MB
+                          </span>
+                        </div>
                       </button>
                     ))}
                   </div>
                 </div>
                 <Button disabled={!project || status !== 'ready' || exportMode === 'server'}
                   onClick={startExport}
-                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50">
-                  <FileVideo className="size-4 mr-2" /> Start export
+                  className="w-full h-11 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 shadow-lg shadow-purple-900/40">
+                  <FileVideo className="size-4 mr-2" />
+                  {aspect === '9:16' ? 'Export for TikTok / Reels' : aspect === '1:1' ? 'Export for Instagram' : 'Export for YouTube'}
                 </Button>
-                {project && status === 'ready' && (
-                  <p className="text-[11px] text-gray-500 text-center">
-                    {(() => {
-                      const dur = clipDuration === 'full' ? Math.min(project.duration, 180) : (clipDuration as number);
-                      const preset = PRESETS.find(p => p.id === presetId);
-                      const lo = preset ? Math.round(dur * preset.w * preset.h * 0.000002) : 0;
-                      const hi = lo * 2;
-                      return `~${Math.ceil(dur)}s to record · approx ${lo}–${hi} MB`;
-                    })()}
-                  </p>
-                )}
+                {project && status === 'ready' && (() => {
+                  const dur = clipDuration === 'full' ? Math.min(project.duration, 180) : (clipDuration as number);
+                  const rec = Math.round(dur);
+                  const ready = Math.round(dur * 1.2);
+                  return (
+                    <p className="text-[10px] text-center text-gray-500 mt-1">Records {rec}s · ready in ~{ready}s</p>
+                  );
+                })()}
+                
                 {exportMode === 'server' && (
                   <p className="text-xs text-amber-400/80">Use Chrome or Firefox on desktop for recording.</p>
                 )}
@@ -4104,112 +4155,150 @@ recorder.start(200);
               </TabsContent>
  
         {/* ── History tab ─────────────────────────────────── */}
-              <TabsContent value="exports" className="p-4 mt-0">
-                <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-3">Export history</div>
+              <TabsContent value="exports" className="mt-0">
+                {/* ── Empty state ── */}
                 {exports.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <FileVideo className="size-8 text-gray-600 mb-3" />
-                    <p className="text-xs text-gray-400">No exports yet</p>
-                    <p className="text-[11px] text-gray-500 mt-1">Use the Export tab to render your first video</p>
+                  <div className="flex flex-col items-center justify-center py-14 text-center px-6">
+                    <div className="size-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
+                      <FileVideo className="size-5 text-gray-400" />
+                    </div>
+                    <div className="text-sm font-semibold text-white/80 mb-1">No exports yet</div>
+                    <div className="text-xs text-gray-500 max-w-[200px] mb-4">Exports appear here so you can download or share them any time.</div>
+                    <button onClick={() => setActiveTab('export')}
+                      className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1">
+                      Go to Export <span aria-hidden>→</span>
+                    </button>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {exports.map((j) => {
-                      const ext = j.storagePath?.endsWith('.mp4') ? 'mp4'
-                                : exportMode === 'mp4' ? 'mp4' : 'webm';
-                      const isCloud = !j.url && !!j.storagePath;
+                  <div className="divide-y divide-white/5">
+                    {[...exports].reverse().map((job) => {
+                      const aspectW = job.aspect === '9:16' ? 'w-10' : job.aspect === '1:1' ? 'w-14' : 'w-20';
+                      const isActive = job.status === 'recording' || job.status === 'finalizing';
+                      const isDownloading = job.status === 'downloading';
+                      const isError = job.status === 'error';
+                      const engineLabel = job.engineId ? (ENGINE_LABELS_SHORT[job.engineId] ?? job.engineId) : null;
+                      const platformLabel = job.aspect === '9:16' ? 'TikTok / Reels' : job.aspect === '1:1' ? 'Instagram' : 'YouTube';
+                      const fileSizeMB = job.size ? (job.size / 1024 / 1024).toFixed(1) : null;
+                      const ext = job.storagePath?.endsWith('.mp4') ? 'mp4' : job.url?.includes('mp4') ? 'mp4' : 'webm';
                       return (
-                        <div key={j.id} className="rounded-xl border bg-white/5 border-white/10 p-3">
-                          <div className="flex items-start gap-2.5 mb-2">
-                            <div className="size-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
-                              <FileVideo className="size-3.5" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-xs font-semibold truncate">{j.name}.{ext}</div>
-                              <div className="text-[11px] text-gray-400">{j.preset} · {j.aspect}{j.size ? ` · ${(j.size / (1024 * 1024)).toFixed(1)} MB` : ''}</div>
-                            </div>
-                            {/* Delete button — always visible */}
-                            {(j.status === 'done' || j.status === 'error') && (
-                              <button
-                                onClick={() => deleteExport(j.id, j.storageId)}
-                                className="size-6 flex items-center justify-center rounded hover:bg-red-500/15 text-gray-500 hover:text-red-400 transition-colors shrink-0"
-                                title="Delete export"
-                              >
-                                <Trash2 className="size-3.5" />
-                              </button>
+                        <div key={job.id} className="group flex gap-3 p-3.5 hover:bg-white/[0.03] transition-colors">
+                          {/* Thumbnail */}
+                          <div className={`relative ${aspectW} shrink-0 rounded-lg overflow-hidden bg-white/5 border border-white/10 self-start`}
+                            style={{ aspectRatio: job.aspect === '9:16' ? '9/16' : job.aspect === '1:1' ? '1/1' : '16/9' }}>
+                            {job.thumbnail ? (
+                              <img src={job.thumbnail} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <FileVideo className="size-3 text-gray-600" />
+                              </div>
                             )}
-                            {j.status !== 'done' && j.status !== 'error' && (
-                              <Badge className="bg-amber-500/20 border-amber-400/30 text-amber-200 capitalize text-[10px]">{j.status}</Badge>
-                            )}
+                            {/* Aspect badge */}
+                            <div className="absolute bottom-0.5 left-0.5">
+                              <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-black/70 text-white/70">{job.aspect}</span>
+                            </div>
                           </div>
-                          {j.status !== 'done' && j.status !== 'error' && (
-                            <div className="h-1 bg-white/10 rounded-full overflow-hidden mb-2">
-                              <div className="h-full bg-gradient-to-r from-purple-400 to-pink-400 transition-all" style={{ width: `${j.progress}%` }} />
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-[12px] text-white truncate mb-0.5">
+                              {job.trackName ?? job.name}
                             </div>
-                          )}
-                          {(j.status === 'recording' || j.status === 'finalizing') && (
-                            <Button size="sm" variant="outline"
-                              className="w-full h-7 text-xs border-red-500/30 text-red-400 hover:bg-red-500/10 mb-2"
-                            onClick={() => {
-                                exportCancelRef.current = true;
-                                if (exportIntervalRef.current) {
-                                  clearInterval(exportIntervalRef.current);
-                                  exportIntervalRef.current = null;
-                                }
-                                recorderRef.current?.stop();
-                              }}>
-                              Cancel export
-                            </Button>
-                          )}
-                          {j.status === 'error' && j.errorMsg && (
-                            <div className="text-[11px] text-red-400 flex items-center gap-1 mb-2">
-                              <CloudOff className="size-3 shrink-0" /> {j.errorMsg}
-                            </div>
-                          )}
-                          {j.status === 'done' && (
-                            <div className="flex gap-2">
-                              {j.url ? (
-                                /* Local blob — download + optional cloud download if also synced */
+                            <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                              {engineLabel && (
+                                <span className="text-[10px] text-gray-400">{engineLabel}</span>
+                              )}
+                              {engineLabel && <span className="text-[10px] text-gray-600">·</span>}
+                              <span className="text-[10px] text-gray-400">{platformLabel}</span>
+                              <span className="text-[10px] text-gray-600">·</span>
+                              <span className="text-[10px] text-gray-500">{job.preset}</span>
+                              {fileSizeMB && (
                                 <>
-                                  <a href={j.url} download={`${j.name}.${ext}`} className="flex-1">
-                                    <Button size="sm" className="w-full bg-white text-gray-900 hover:bg-gray-100 h-7 text-xs">
-                                      <Download className="size-3 mr-1" /> Download
-                                    </Button>
-                                  </a>
-                                  {j.storagePath && (
-                                    <Button size="sm" variant="outline"
-                                      className="border-white/20 text-white hover:bg-white/10 h-7 text-xs"
-                                      title="Open shareable page (link valid 7 days)"
-                                      onClick={async () => {
-                                        const url = await getExportSignedUrl(j.storagePath!, 604800); // 7 days
-                                        if (url) {
-                                          const params = new URLSearchParams({
-                                            v: url,
-                                            n: project?.fileName?.replace(/\.[^.]+$/, '') ?? 'Track',
-                                            e: engine,
-                                            a: j.aspect ?? aspect,
-                                          });
-                                          window.open(`/share?${params}`, '_blank');
-                                        }
-                                      }}>
-                                      <Share2 className="size-3 mr-1" /> Share
-                                    </Button>
-                                  )}
+                                  <span className="text-[10px] text-gray-600">·</span>
+                                  <span className="text-[10px] text-gray-500">{fileSizeMB} MB · .{ext}</span>
                                 </>
-                              ) : isCloud ? (
-                                /* Cloud-stored export — re-generate signed URL */
-                                <Button size="sm"
-                                  className="flex-1 bg-white/10 hover:bg-white/15 text-white h-7 text-xs border border-white/20"
-                                  onClick={() => downloadCloudExport(j)}>
-                                  <Cloud className="size-3 mr-1" /> Download from cloud
-                                </Button>
-                              ) : (
-                                <span className="text-[11px] text-gray-500 flex items-center gap-1">
-                                  <CloudOff className="size-3" /> No file available
-                                </span>
                               )}
                             </div>
-                          )}
+
+                            {/* Progress */}
+                            {isActive && (
+                              <div className="mb-2">
+                                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden mb-1">
+                                  <div className="h-full rounded-full transition-all duration-300"
+                                    style={{
+                                      width: `${job.progress}%`,
+                                      background: 'linear-gradient(to right, #a855f7, #ec4899)',
+                                    }} />
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] text-gray-400">
+                                    {job.status === 'finalizing' ? 'Finalizing…' : `${Math.round(job.progress)}%`}
+                                  </span>
+                                  <button onClick={() => {
+                                    exportCancelRef.current = true;
+                                    recorderRef.current?.stop();
+                                  }} className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Error state */}
+                            {isError && (
+                              <div className="flex items-start gap-1.5 p-2 rounded-lg bg-red-500/10 border border-red-500/20 mb-2">
+                                <AlertCircle className="size-3 text-red-400 shrink-0 mt-0.5" />
+                                <span className="text-[10px] text-red-300 leading-tight">{job.errorMsg || 'Export failed'}</span>
+                              </div>
+                            )}
+
+                            {/* Actions */}
+                            {job.status === 'done' && (
+                              <div className="flex items-center gap-2">
+                                {job.url ? (
+                                  <a href={job.url} download={`${job.trackName ?? job.name}.${ext}`}
+                                    className="flex items-center gap-1 text-[11px] font-medium text-purple-400 hover:text-purple-300 transition-colors">
+                                    <Download className="size-3" /> Download
+                                  </a>
+                                ) : job.storagePath ? (
+                                  <button onClick={() => downloadCloudExport(job)}
+                                    disabled={isDownloading}
+                                    className="flex items-center gap-1 text-[11px] font-medium text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50">
+                                    {isDownloading ? <Loader2 className="size-3 animate-spin" /> : <Cloud className="size-3" />}
+                                    {isDownloading ? 'Downloading…' : 'Download'}
+                                  </button>
+                                ) : (
+                                  <span className="text-[11px] text-gray-600 flex items-center gap-1">
+                                    <CloudOff className="size-3" /> File expired
+                                  </span>
+                                )}
+                                {job.url && typeof navigator.share !== 'undefined' && (
+                                  <button onClick={async () => {
+                                    if (!job.blob) return;
+                                    try {
+                                      const file = new File([job.blob], `${job.trackName ?? job.name}.${ext}`, { type: job.blob.type });
+                                      if (navigator.canShare?.({ files: [file] })) {
+                                        await navigator.share({ files: [file] });
+                                      }
+                                    } catch {}
+                                  }} className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-200 transition-colors">
+                                    <Share2 className="size-3" /> Share
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            {isDownloading && (
+                              <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
+                                <Loader2 className="size-3 animate-spin" /> Downloading from cloud…
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Delete button */}
+                          <button onClick={() => deleteExport(job.id, job.storageId)}
+                            className="shrink-0 size-6 rounded-lg flex items-center justify-center text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-colors opacity-0 group-hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 opacity-100 self-start mt-0.5"
+                            title="Delete">
+                            <Trash2 className="size-3" />
+                          </button>
                         </div>
                       );
                     })}
