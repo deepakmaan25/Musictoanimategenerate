@@ -99,30 +99,31 @@ const ENGINE_LABELS_SHORT: Record<string, string> = {
   terrain: 'Terrain', tunnel: 'Aurora', neon_spheres: 'Spheres', fractal: 'Fractal', solar: 'Pulse',
 };
 
+// ENGINE_COLORS uses inline CSS values (not Tailwind classes) to avoid purging in production
 const ENGINE_COLORS: Record<string, { bg: string; border: string; text: string; chip: string; chipBorder: string; chipText: string }> = {
-  bars:         { bg: 'bg-cyan-500/15',    border: 'border-cyan-400/50',    text: 'text-cyan-300',    chip: 'bg-cyan-500/20',    chipBorder: 'border-cyan-400/40',    chipText: 'text-cyan-200'    },
-  radial:       { bg: 'bg-violet-500/15',  border: 'border-violet-400/50',  text: 'text-violet-300',  chip: 'bg-violet-500/20',  chipBorder: 'border-violet-400/40',  chipText: 'text-violet-200'  },
-  orbital:      { bg: 'bg-blue-500/15',    border: 'border-blue-400/50',    text: 'text-blue-300',    chip: 'bg-blue-500/20',    chipBorder: 'border-blue-400/40',    chipText: 'text-blue-200'    },
-  depth:        { bg: 'bg-indigo-500/15',  border: 'border-indigo-400/50',  text: 'text-indigo-300',  chip: 'bg-indigo-500/20',  chipBorder: 'border-indigo-400/40',  chipText: 'text-indigo-200'  },
-  terrain:      { bg: 'bg-emerald-500/15', border: 'border-emerald-400/50', text: 'text-emerald-300', chip: 'bg-emerald-500/20', chipBorder: 'border-emerald-400/40', chipText: 'text-emerald-200' },
-  tunnel:       { bg: 'bg-teal-500/15',    border: 'border-teal-400/50',    text: 'text-teal-300',    chip: 'bg-teal-500/20',    chipBorder: 'border-teal-400/40',    chipText: 'text-teal-200'    },
-  neon_spheres: { bg: 'bg-pink-500/15',    border: 'border-pink-400/50',    text: 'text-pink-300',    chip: 'bg-pink-500/20',    chipBorder: 'border-pink-400/40',    chipText: 'text-pink-200'    },
-  fractal:      { bg: 'bg-fuchsia-500/15', border: 'border-fuchsia-400/50', text: 'text-fuchsia-300', chip: 'bg-fuchsia-500/20', chipBorder: 'border-fuchsia-400/40', chipText: 'text-fuchsia-200' },
-  solar:        { bg: 'bg-amber-500/15',   border: 'border-amber-400/50',   text: 'text-amber-300',   chip: 'bg-amber-500/20',   chipBorder: 'border-amber-400/40',   chipText: 'text-amber-200'   },
+  bars:         { bg: 'rgba(6,182,212,0.15)',   border: 'rgba(34,211,238,0.50)',   text: '#67e8f9', chip: 'rgba(6,182,212,0.20)',   chipBorder: 'rgba(34,211,238,0.40)',   chipText: '#a5f3fc' },
+  radial:       { bg: 'rgba(139,92,246,0.15)',  border: 'rgba(167,139,250,0.50)',  text: '#c4b5fd', chip: 'rgba(139,92,246,0.20)',  chipBorder: 'rgba(167,139,250,0.40)',  chipText: '#ddd6fe' },
+  orbital:      { bg: 'rgba(59,130,246,0.15)',  border: 'rgba(96,165,250,0.50)',   text: '#93c5fd', chip: 'rgba(59,130,246,0.20)',  chipBorder: 'rgba(96,165,250,0.40)',   chipText: '#bfdbfe' },
+  depth:        { bg: 'rgba(99,102,241,0.15)',  border: 'rgba(129,140,248,0.50)',  text: '#a5b4fc', chip: 'rgba(99,102,241,0.20)',  chipBorder: 'rgba(129,140,248,0.40)',  chipText: '#c7d2fe' },
+  terrain:      { bg: 'rgba(16,185,129,0.15)',  border: 'rgba(52,211,153,0.50)',   text: '#6ee7b7', chip: 'rgba(16,185,129,0.20)',  chipBorder: 'rgba(52,211,153,0.40)',   chipText: '#a7f3d0' },
+  tunnel:       { bg: 'rgba(20,184,166,0.15)',  border: 'rgba(45,212,191,0.50)',   text: '#5eead4', chip: 'rgba(20,184,166,0.20)',  chipBorder: 'rgba(45,212,191,0.40)',   chipText: '#99f6e4' },
+  neon_spheres: { bg: 'rgba(236,72,153,0.15)',  border: 'rgba(244,114,182,0.50)',  text: '#f9a8d4', chip: 'rgba(236,72,153,0.20)',  chipBorder: 'rgba(244,114,182,0.40)',  chipText: '#fbcfe8' },
+  fractal:      { bg: 'rgba(217,70,239,0.15)',  border: 'rgba(232,121,249,0.50)',  text: '#f0abfc', chip: 'rgba(217,70,239,0.20)',  chipBorder: 'rgba(232,121,249,0.40)',  chipText: '#f5d0fe' },
+  solar:        { bg: 'rgba(245,158,11,0.15)',  border: 'rgba(251,191,36,0.50)',   text: '#fcd34d', chip: 'rgba(245,158,11,0.20)',  chipBorder: 'rgba(251,191,36,0.40)',   chipText: '#fde68a' },
 };
 
 // ── Per-engine optimal motion defaults ────────────────────────────────────────
 type MotionDefaults = { beatSensitivity: number; particleDensity: number; smoothing: number; baseSpeed: number; beatResponse: number };
 const ENGINE_MOTION_DEFAULTS: Record<string, MotionDefaults> = {
-  bars:         { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.80, baseSpeed: 1.0, beatResponse: 0.90 },
-  radial:       { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.80, baseSpeed: 1.0, beatResponse: 0.90 },
-  orbital:      { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.80, baseSpeed: 1.0, beatResponse: 0.90 },
-  depth:        { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.65, baseSpeed: 1.0, beatResponse: 0.90 },
-  terrain:      { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.80, baseSpeed: 1.0, beatResponse: 0.90 },
-  tunnel:       { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.80, baseSpeed: 1.0, beatResponse: 0.90 },
-  neon_spheres: { beatSensitivity: 0.8, particleDensity: 0.97, smoothing: 0.80, baseSpeed: 1.0, beatResponse: 0.90 },
-  fractal:      { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.80, baseSpeed: 1.0, beatResponse: 0.90 },
-  solar:        { beatSensitivity: 0.8, particleDensity: 0.95, smoothing: 0.80, baseSpeed: 1.0, beatResponse: 0.90 },
+  bars:         { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
+  radial:       { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
+  orbital:      { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
+  depth:        { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
+  terrain:      { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.85, baseSpeed: 1.0, beatResponse: 0.90 },
+  tunnel:       { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
+  neon_spheres: { beatSensitivity: 0.8, particleDensity: 0.97, smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
+  fractal:      { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
+  solar:        { beatSensitivity: 0.8, particleDensity: 0.95, smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
 };
 
 // ─── Engine style variants ────────────────────────────────────────────────────
@@ -269,7 +270,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
   const [palette, setPalette]                 = useState(stored?.style.palette ?? 0);
   const [beatSensitivity, setBeatSensitivity] = useState(stored?.motion.beatSensitivity ?? 0.8);
   const [particleDensity, setParticleDensity] = useState(stored?.motion.particleDensity ?? 0.6);
-  const [smoothing, setSmoothing]             = useState(stored?.motion.smoothing ?? 0.8);
+  const [smoothing, setSmoothing]             = useState(stored?.motion.smoothing ?? 0.92);
   const [perfMode, setPerfMode]               = useState(false);
   const [baseSpeed, setBaseSpeed]             = useState(0.15);   // gentle cruise by default
   const [beatResponse, setBeatResponse]       = useState(0.55);   // noticeable but not chaotic
@@ -3252,7 +3253,7 @@ recorder.start(200);
             <div className="text-[11px] text-gray-400 truncate">
               {project ? (
                 <span>
-                  {fmt(project.duration)} · <span className={ENGINE_COLORS[engine]?.text ?? 'text-gray-400'}>{ENGINES.find((e) => e.id === engine)!.name}</span>
+                  {fmt(project.duration)} · <span style={{ color: ENGINE_COLORS[engine]?.text ?? '#9ca3af' }}>{ENGINES.find((e) => e.id === engine)!.name}</span>
                 </span>
               ) : 'No track loaded'}
             </div>
@@ -3778,11 +3779,10 @@ recorder.start(200);
                             key={rec.engineId}
                             title={rec.reason}
                             onClick={() => setEngine(rec.engineId)}
-                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${
-                              engine === rec.engineId
-                                ? `${ENGINE_COLORS[rec.engineId]?.bg ?? 'bg-purple-500/30'} ${ENGINE_COLORS[rec.engineId]?.border ?? 'border-purple-400/60'} ${ENGINE_COLORS[rec.engineId]?.text ?? 'text-purple-100'}`
-                                : `${ENGINE_COLORS[rec.engineId]?.chip ?? 'bg-purple-500/10'} border-white/10 ${ENGINE_COLORS[rec.engineId]?.chipText ?? 'text-purple-300'} hover:opacity-80`
-                            }`}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-all hover:opacity-90"
+                            style={engine === rec.engineId
+                              ? { background: ENGINE_COLORS[rec.engineId]?.bg ?? 'rgba(168,85,247,0.20)', borderColor: ENGINE_COLORS[rec.engineId]?.border ?? 'rgba(168,85,247,0.50)', color: ENGINE_COLORS[rec.engineId]?.text ?? '#e9d5ff' }
+                              : { background: ENGINE_COLORS[rec.engineId]?.chip ?? 'rgba(168,85,247,0.10)', borderColor: 'rgba(255,255,255,0.10)', color: ENGINE_COLORS[rec.engineId]?.chipText ?? '#d8b4fe' }}
                           >
                             {engineName}
                             <span className="text-[9px] opacity-60">★</span>
@@ -3885,8 +3885,12 @@ recorder.start(200);
                     {ENGINES.filter((e) => e.group === group).map((e) => (
                       <div key={e.id}>
                         <button onClick={() => setEngine(e.id)}
-                          className={`w-full text-left px-3 py-2.5 rounded-lg border transition-all text-xs ${engine === e.id ? 'bg-white text-gray-900 border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}>
-                          <div className="font-semibold flex items-center justify-between">
+                          className="w-full text-left px-3 py-2.5 rounded-lg border transition-all text-xs"
+                          style={engine === e.id
+                            ? { background: ENGINE_COLORS[e.id]?.bg ?? 'rgba(255,255,255,0.10)', borderColor: ENGINE_COLORS[e.id]?.border ?? 'rgba(255,255,255,0.40)' }
+                            : { background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.10)' }}>
+                          <div className="font-semibold flex items-center justify-between"
+                            style={{ color: engine === e.id ? (ENGINE_COLORS[e.id]?.text ?? '#ffffff') : '#ffffff' }}>
                             {e.name}
                             {VARIANTS[e.id] && <span className="text-[9px] opacity-40 font-normal">{VARIANTS[e.id]!.length} styles</span>}
                           </div>
@@ -3904,11 +3908,10 @@ recorder.start(200);
                                     key={v.id}
                                     onClick={() => setVariant(v.id === VARIANTS[e.id]![0].id ? '' : v.id)}
                                     title={v.description}
-                                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all ${
-                                      active
-                                        ? `${ENGINE_COLORS[e.id]?.chip ?? 'bg-purple-500/25'} ${ENGINE_COLORS[e.id]?.chipBorder ?? 'border-purple-400/50'} ${ENGINE_COLORS[e.id]?.chipText ?? 'text-purple-200'}`
-                                        : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-gray-200'
-                                    }`}
+                                    className="px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all"
+                                    style={active
+                                      ? { background: ENGINE_COLORS[e.id]?.chip ?? 'rgba(168,85,247,0.20)', borderColor: ENGINE_COLORS[e.id]?.chipBorder ?? 'rgba(168,85,247,0.50)', color: ENGINE_COLORS[e.id]?.chipText ?? '#e9d5ff' }
+                                      : { background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.10)', color: '#9ca3af' }}
                                   >
                                     {v.label}
                                   </button>
@@ -4037,13 +4040,12 @@ recorder.start(200);
                   <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                     {ASPECTS.map((a) => (
                       <button key={a.id} onClick={() => setAspect(a.id)}
-                        className={`p-2 rounded-lg border text-left transition-colors ${
-                          aspect === a.id
-                            ? `${ENGINE_COLORS[engine]?.bg ?? 'bg-white/10'} ${ENGINE_COLORS[engine]?.border ?? 'border-white/40'}`
-                            : 'bg-white/5 border-white/15 hover:bg-white/10'
-                        }`}>
-                        <div className={`font-semibold text-xs ${aspect === a.id ? (ENGINE_COLORS[engine]?.text ?? 'text-white') : 'text-white'}`}>{a.label}</div>
-                        <div className={`text-[10px] ${aspect === a.id ? 'opacity-70' : 'opacity-50'}`}>{a.sub}</div>
+                        className="p-2 rounded-lg border text-left transition-colors"
+                        style={aspect === a.id
+                          ? { background: ENGINE_COLORS[engine]?.bg ?? 'rgba(255,255,255,0.10)', borderColor: ENGINE_COLORS[engine]?.border ?? 'rgba(255,255,255,0.40)' }
+                          : { background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.15)' }}>
+                        <div className="font-semibold text-xs" style={{ color: aspect === a.id ? (ENGINE_COLORS[engine]?.text ?? '#ffffff') : '#ffffff' }}>{a.label}</div>
+                        <div className="text-[10px]" style={{ opacity: aspect === a.id ? 0.7 : 0.5 }}>{a.sub}</div>
                       </button>
                     ))}
                   </div>
