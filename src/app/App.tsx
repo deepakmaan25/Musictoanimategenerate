@@ -28,7 +28,7 @@ const ENGINES: {
   { id: 'neon_tunnel',    studio: 'tunnel',      previewStyle: 'tunnel',    name: 'Liquid Aurora',    icon: <Wand2 className="size-4" />,   description: 'Flowing aurora ribbons that ripple with every frequency.', moods: ['Dreamy', 'Cinematic'],     gradient: 'linear-gradient(135deg, #06b6d4 0%, #a855f7 100%)' },
   { id: 'audio_terrain', studio: 'terrain', previewStyle: 'terrain', name: 'Audio Terrain', icon: <Music2 className="size-4" />, description: 'Wireframe landscape that rises with your track.', moods: ['Cinematic', 'Instrumental'], gradient: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)' },
   { id: 'orbital_rings', studio: 'orbital', previewStyle: 'rings', name: 'Orbital Rings', icon: <Layers className="size-4" />, description: 'Concentric rings tilt and pulse around a neon core.', moods: ['Dreamy', 'Futuristic'], gradient: 'linear-gradient(135deg, #a855f7 0%, #3b82f6 100%)' },
-  { id: 'neon_spheres', studio: 'neon_spheres', previewStyle: 'spheres', name: 'Plasma Blobs', icon: <Sparkles className="size-4" />, description: 'Organic plasma blobs that merge and burst with every beat.', moods: ['Dreamy', 'Vocal-Heavy'], gradient: 'linear-gradient(135deg, #e838dc 0%, #8b5cf6 100%)' },
+  { id: 'neon_spheres', studio: 'neon_spheres', previewStyle: 'field',   name: 'Resonance Field', icon: <Sparkles className="size-4" />, description: 'A 3D lattice of nodes whose strings glow with frequency tension.', moods: ['Melodic', 'Instrumental'], gradient: 'linear-gradient(135deg, #14b8a6 0%, #6366f1 100%)' },
   { id: 'fractal_kaleido', studio: 'fractal', previewStyle: 'fractal', name: 'Kaleidoscope', icon: <Palette className="size-4" />, description: 'Mirrored fractal patterns synced to music energy.', moods: ['Trippy', 'Instrumental'], gradient: 'linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%)' },
   { id: 'spectrum_bars',  studio: 'bars',    previewStyle: 'bars',    name: 'Spectrum Bars', icon: <Zap className="size-4" />,     description: 'Classic frequency bars — every beat, every frequency, instant.', moods: ['High-Energy', 'Vocal-Heavy'], gradient: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)' },
 ];
@@ -607,25 +607,22 @@ function EnginePreview({ style }: { style: string }) {
       <style>{`@keyframes ringA{from{transform:rotate(0deg)scaleY(.45)}to{transform:rotate(15deg)scaleY(.6)}}`}</style>
     </div>
   );
-  if (style === 'spheres') return (
-    <div className="absolute inset-0 overflow-hidden">
-      {/* Plasma blob preview — large soft blobs that drift and overlap */}
-      {[
-        {x:38,y:42,s:26,c:'rgba(232,56,220,0.85)',d:'0s'},
-        {x:58,y:38,s:22,c:'rgba(139,92,246,0.80)',d:'.55s'},
-        {x:50,y:60,s:20,c:'rgba(232,56,220,0.70)',d:'1.1s'},
-      ].map((b,i) => (
-        <div key={i} style={{
-          position:'absolute', borderRadius:'50%',
-          width:b.s, height:b.s,
-          left:`${b.x}%`, top:`${b.y}%`,
-          background: `radial-gradient(circle at 35% 35%, #fff 0%, ${b.c} 45%, transparent 70%)`,
-          filter:'blur(3px)',
-          animation:`blobA 2.2s ease-in-out infinite alternate`,
-          animationDelay:b.d,
-        }} />
-      ))}
-      <style>{`@keyframes blobA{from{transform:scale(1) translate(0,0)}to{transform:scale(1.25) translate(4px,-5px)}}`}</style>
+  if (style === 'field') return (
+    <div className="absolute inset-0 flex items-center justify-center" style={{perspective:'200px'}}>
+      <svg viewBox="0 0 80 80" width="80" height="80" style={{transform:'rotateX(28deg) rotateY(-18deg)', overflow:'visible'}}>
+        {/* Grid edges */}
+        {[[10,20,40,20],[40,20,70,20],[10,40,40,40],[40,40,70,40],[10,60,40,60],[40,60,70,60],
+          [10,20,10,40],[10,40,10,60],[40,20,40,40],[40,40,40,60],[70,20,70,40],[70,40,70,60]].map(([x1,y1,x2,y2],i)=>(
+          <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(94,234,212,0.45)" strokeWidth="0.8"/>
+        ))}
+        {/* Nodes — alternate colours */}
+        {[[10,20,0],[40,20,1],[70,20,0],[10,40,1],[40,40,0],[70,40,1],[10,60,0],[40,60,1],[70,60,0]].map(([x,y,c],i)=>(
+          <circle key={i} cx={x} cy={y} r="3.5"
+            fill={c ? '#818cf8' : '#5eead4'}
+            style={{filter:'blur(0.5px)',animation:`rNode 1.8s ease-in-out infinite alternate`,animationDelay:`${i*0.22}s`}}/>
+        ))}
+      </svg>
+      <style>{`@keyframes rNode{from{r:2.5;opacity:.5}to{r:5;opacity:1}}`}</style>
     </div>
   );
   if (style === 'fractal') return (
