@@ -30,6 +30,7 @@ const ENGINES: {
   { id: 'orbital_rings', studio: 'orbital', previewStyle: 'rings', name: 'Orbital Rings', icon: <Layers className="size-4" />, description: 'Concentric rings tilt and pulse around a neon core.', moods: ['Dreamy', 'Futuristic'], gradient: 'linear-gradient(135deg, #a855f7 0%, #3b82f6 100%)' },
   { id: 'neon_spheres', studio: 'neon_spheres', previewStyle: 'spheres', name: 'Neon Spheres', icon: <Sparkles className="size-4" />, description: 'Glowing spheres wobbling with each frequency band.', moods: ['Dreamy', 'Vocal-Heavy'], gradient: 'linear-gradient(135deg, #ec4899 0%, #f59e0b 100%)' },
   { id: 'fractal_kaleido', studio: 'fractal', previewStyle: 'fractal', name: 'Kaleidoscope', icon: <Palette className="size-4" />, description: 'Mirrored fractal patterns synced to music energy.', moods: ['Trippy', 'Instrumental'], gradient: 'linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%)' },
+  { id: 'spectrum_bars',  studio: 'bars',    previewStyle: 'bars',    name: 'Spectrum Bars', icon: <Zap className="size-4" />,     description: 'Classic frequency bars — every beat, every frequency, instant.', moods: ['High-Energy', 'Vocal-Heavy'], gradient: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)' },
 ];
 
 const PROJECTS_PER_PAGE = 6;
@@ -623,11 +624,14 @@ function EnginePreview({ style }: { style: string }) {
   );
   if (style === 'solar') return (
     <div className="absolute inset-0 flex items-center justify-center">
-      <div className="size-4 rounded-full bg-white/80" style={{ boxShadow:'0 0 12px 4px rgba(255,200,50,.6)', animation:'solA 1.5s ease-in-out infinite alternate' }} />
-      <div className="absolute rounded-full border border-white/30" style={{ width:38, height:38, animation:'orbA 2s linear infinite' }}>
-        <div className="absolute size-2 rounded-full bg-white/70" style={{ top:'50%', right:-4, marginTop:-4 }} />
-      </div>
-      <style>{`@keyframes solA{from{box-shadow:0 0 8px 3px rgba(255,200,50,.5)}to{box-shadow:0 0 16px 6px rgba(255,200,50,.8)}} @keyframes orbA{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
+      {[8,16,24].map((r,i) => (
+        <div key={i} className="absolute rounded-full border border-white"
+          style={{ width:r*2, height:r*2, opacity: 0.35 + i*0.18,
+            animation:`geoA ${0.9 + i*0.35}s ease-out infinite`,
+            animationDelay:`${i*0.28}s` }} />
+      ))}
+      <div className="size-3 rounded-full bg-white/90" style={{ boxShadow:'0 0 8px 3px rgba(255,255,255,.5)' }} />
+      <style>{`@keyframes geoA{0%{transform:scale(.5);opacity:.9}100%{transform:scale(1.6);opacity:0}}`}</style>
     </div>
   );
   return null;
