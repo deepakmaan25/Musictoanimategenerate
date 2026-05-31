@@ -436,7 +436,7 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
               {step === 'signup' && (
                 <motion.div key="signup" {...fwd}>
                   <div className="flex items-center gap-1.5 mb-1">
-                    <button onClick={() => { setStep('password'); setError(null); }}
+                    <button onClick={() => { setStep('email'); setError(null); }}
                       className="size-8 rounded-md hover:bg-black/5 flex items-center justify-center shrink-0">
                       <ArrowLeft className="size-4" />
                     </button>
@@ -447,7 +447,25 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
                     Account for <strong style={{ color: 'var(--text-strong)' }}>{email}</strong>
                   </p>
                   <form onSubmit={handleSignUp} className="space-y-3">
-                    <PasswordInput value={password} onChange={setPassword} placeholder="Create a password (min 6 chars)" autoComplete="new-password" autoFocus />
+                    <div>
+                      <PasswordInput value={password} onChange={setPassword} placeholder="Create a password (min 6 chars)" autoComplete="new-password" autoFocus />
+                      {password.length > 0 && (
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <div className="flex gap-1 flex-1">
+                            {[1,2,3].map(n => (
+                              <div key={n} className="h-1 flex-1 rounded-full transition-all" style={{
+                                background: password.length >= n * 4
+                                  ? n === 1 ? '#ef4444' : n === 2 ? '#f59e0b' : '#10b981'
+                                  : 'rgba(255,255,255,0.08)'
+                              }} />
+                            ))}
+                          </div>
+                          <span className="text-[10px]" style={{ color: password.length < 4 ? '#ef4444' : password.length < 8 ? '#f59e0b' : '#10b981' }}>
+                            {password.length < 4 ? 'Weak' : password.length < 8 ? 'Fair' : 'Strong'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                     <PasswordInput value={confirm}  onChange={setConfirm}  placeholder="Confirm password" autoComplete="new-password" />
                     {error && (
                       <div className="flex items-start gap-2 rounded-lg px-3 py-2.5 text-xs"
