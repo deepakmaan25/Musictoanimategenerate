@@ -193,7 +193,7 @@ export function SharePage() {
             {/* Loading */}
             {!loaded && !error && (
               <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12, zIndex:20, background:'#0a0a14' }}>
-                <div style={{ width:32, height:32, borderRadius:'50%', border:'2px solid rgba(255,255,255,0.08)', borderTopColor:'rgba(255,255,255,0.55)' animation:'spin 0.8s linear infinite' }} />
+                <div style={{ width:32, height:32, borderRadius:'50%', border:'2px solid rgba(255,255,255,0.08)', borderTopColor:'rgba(255,255,255,0.55)', animation:'spin 0.8s linear infinite' }} />
                 <p style={{ fontSize:11, color:'rgba(255,255,255,0.22)' }}>Loading…</p>
               </div>
             )}
