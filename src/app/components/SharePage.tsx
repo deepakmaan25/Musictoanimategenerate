@@ -44,9 +44,31 @@ export function SharePage() {
 
   useEffect(() => {
     document.title = `${trackName} — Music Animate`;
+
+    // OG meta tags for social sharing previews
+    const metas: [string, string, string][] = [
+      ['property', 'og:title',            `${trackName} — Music Animate`],
+      ['property', 'og:description',      `${meta.label} visualization · Made with Music Animate`],
+      ['property', 'og:url',              window.location.href],
+      ['property', 'og:type',             'video.other'],
+      ['name',     'twitter:card',        'summary_large_image'],
+      ['name',     'twitter:title',       `${trackName} — Music Animate`],
+      ['name',     'twitter:description', `${meta.label} visualization`],
+    ];
+    const injected: HTMLMetaElement[] = [];
+    metas.forEach(([attr, name, val]) => {
+      const el = document.createElement('meta');
+      el.setAttribute(attr, name);
+      el.setAttribute('content', val);
+      el.setAttribute('data-ma-share', '1');
+      document.head.appendChild(el);
+      injected.push(el);
+    });
+
     const style = document.createElement('style');
     style.id = 'ma-share-styles';
     style.textContent = `
+      @keyframes spin { to { transform: rotate(360deg) } }
       @keyframes ma-drift {
         0%,100% { transform:translate(-2%,-2%) scale(1.06); }
         33%      { transform:translate( 2%,-1%) scale(1.08); }
@@ -57,7 +79,10 @@ export function SharePage() {
       .ma-in    { animation: ma-in 0.5s ease both; }
     `;
     if (!document.getElementById('ma-share-styles')) document.head.appendChild(style);
-    return () => { document.getElementById('ma-share-styles')?.remove(); };
+    return () => {
+      document.getElementById('ma-share-styles')?.remove();
+      injected.forEach(el => el.remove());
+    };
   }, [trackName]);
 
   // Auto-play muted once video metadata is ready
@@ -168,7 +193,7 @@ export function SharePage() {
             {/* Loading */}
             {!loaded && !error && (
               <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12, zIndex:20, background:'#0a0a14' }}>
-                <div style={{ width:32, height:32, borderRadius:'50%', border:'2px solid rgba(255,255,255,0.08)', borderTopColor:'rgba(255,255,255,0.55)' }} className="animate-spin" />
+                <div style={{ width:32, height:32, borderRadius:'50%', border:'2px solid rgba(255,255,255,0.08)', borderTopColor:'rgba(255,255,255,0.55)' animation:'spin 0.8s linear infinite' }} />
                 <p style={{ fontSize:11, color:'rgba(255,255,255,0.22)' }}>Loading…</p>
               </div>
             )}
@@ -211,9 +236,11 @@ export function SharePage() {
                 {/* Bottom gradient */}
                 <div style={{ position:'absolute', inset:'auto 0 0 0', zIndex:20, paddingTop:40, background:'linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)' }}>
                   {/* Seek bar */}
-                  <div style={{ margin:'0 12px 8px', height:3, background:'rgba(255,255,255,0.15)', borderRadius:99, cursor:'pointer', position:'relative' }}
+                  <div style={{ margin:'0 12px 8px', height:20, display:'flex', alignItems:'center', cursor:'pointer', position:'relative' }}
                     onClick={seekTo}>
-                    <div style={{ height:'100%', borderRadius:99, background:meta.gradient, width:`${progress}%`, transition:'width 0.1s linear' }} />
+                    <div style={{ height:4, width:'100%', background:'rgba(255,255,255,0.15)', borderRadius:99, position:'relative', overflow:'hidden' }}>
+                      <div style={{ height:'100%', borderRadius:99, background:meta.gradient, width:`${progress}%`, transition:'width 0.1s linear' }} />
+                    </div>
                   </div>
                   {/* Controls */}
                   <div style={{ display:'flex', alignItems:'center', gap:8, padding:'0 12px 12px' }}>
@@ -269,23 +296,49 @@ export function SharePage() {
 
             {/* Action buttons */}
             <div style={{ display:'flex', flexDirection: (!is916 && !is11) ? 'column' : 'row', gap:10, flexShrink:0 }}>
-              <a href={videoUrl} download
-                style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px 20px', borderRadius:12, fontSize:13, fontWeight:600, color:'white', background:meta.gradient, textDecoration:'none', whiteSpace:'nowrap', minWidth:130, transition:'opacity .15s' }}
-                onMouseEnter={e=>(e.currentTarget as HTMLAnchorElement).style.opacity='0.88'}
-                onMouseLeave={e=>(e.currentTarget as HTMLAnchorElement).style.opacity='1'}>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch(videoUrl);
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${trackName}.${videoUrl.includes('.mp4') ? 'mp4' : 'webm'}`;
+                    a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 5000);
+                  } catch {
+                    window.open(videoUrl, '_blank');
+                  }
+                }}
+                style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px 20px', borderRadius:12, fontSize:13, fontWeight:600, color:'white', background:meta.gradient, border:'none', cursor:'pointer', whiteSpace:'nowrap', minWidth:130, transition:'opacity .15s' }}
+                onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.opacity='0.88'}
+                onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.opacity='1'}>
                 <Download style={{ width:14, height:14, flexShrink:0 }} /> Download
-              </a>
+              </button>
+              {/* Copy link */}
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href).then(() => {
+                    const btn = document.getElementById('ma-copy-btn');
+                    if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy link'; }, 2000); }
+                  }).catch(() => {});
+                }}
+                id="ma-copy-btn"
+                style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'10px 20px', borderRadius:12, fontSize:13, fontWeight:500, color:'rgba(255,255,255,0.55)', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', cursor:'pointer', whiteSpace:'nowrap', minWidth:130, transition:'all .15s' }}
+                onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.color='rgba(255,255,255,0.88)';(e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.2)';}}
+                onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.color='rgba(255,255,255,0.55)';(e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.1)';}}>
+                Copy link
+              </button>
               <a href="/"
                 style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'10px 20px', borderRadius:12, fontSize:13, fontWeight:500, color:'rgba(255,255,255,0.55)', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', textDecoration:'none', whiteSpace:'nowrap', minWidth:130, transition:'all .15s' }}
                 onMouseEnter={e=>{(e.currentTarget as HTMLAnchorElement).style.color='rgba(255,255,255,0.88)';(e.currentTarget as HTMLAnchorElement).style.borderColor='rgba(255,255,255,0.2)';}}
                 onMouseLeave={e=>{(e.currentTarget as HTMLAnchorElement).style.color='rgba(255,255,255,0.55)';(e.currentTarget as HTMLAnchorElement).style.borderColor='rgba(255,255,255,0.1)';}}>
                 Make yours →
               </a>
-              {(!is916 && !is11) && (
-                <p style={{ fontSize:10, color:'rgba(255,255,255,0.2)', lineHeight:1.5, marginTop:4 }}>
-                  Link valid 7 days<br/>Download to keep permanently
-                </p>
-              )}
+              <p style={{ fontSize:10, color:'rgba(255,255,255,0.2)', lineHeight:1.5, marginTop:4 }}>
+                Link valid 7 days · Download to keep permanently
+              </p>
             </div>
           </div>
         </div>
