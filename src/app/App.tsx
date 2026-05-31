@@ -28,7 +28,7 @@ const ENGINES: {
   { id: 'neon_tunnel',    studio: 'tunnel',      previewStyle: 'tunnel',    name: 'Liquid Aurora',    icon: <Wand2 className="size-4" />,   description: 'Flowing aurora ribbons that ripple with every frequency.', moods: ['Dreamy', 'Cinematic'],     gradient: 'linear-gradient(135deg, #06b6d4 0%, #a855f7 100%)' },
   { id: 'audio_terrain', studio: 'terrain', previewStyle: 'terrain', name: 'Audio Terrain', icon: <Music2 className="size-4" />, description: 'Wireframe landscape that rises with your track.', moods: ['Cinematic', 'Instrumental'], gradient: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)' },
   { id: 'orbital_rings', studio: 'orbital', previewStyle: 'rings', name: 'Orbital Rings', icon: <Layers className="size-4" />, description: 'Concentric rings tilt and pulse around a neon core.', moods: ['Dreamy', 'Futuristic'], gradient: 'linear-gradient(135deg, #a855f7 0%, #3b82f6 100%)' },
-  { id: 'neon_spheres', studio: 'neon_spheres', previewStyle: 'spheres', name: 'Neon Spheres', icon: <Sparkles className="size-4" />, description: 'Glowing spheres wobbling with each frequency band.', moods: ['Dreamy', 'Vocal-Heavy'], gradient: 'linear-gradient(135deg, #ec4899 0%, #f59e0b 100%)' },
+  { id: 'neon_spheres', studio: 'neon_spheres', previewStyle: 'spheres', name: 'Plasma Blobs', icon: <Sparkles className="size-4" />, description: 'Organic plasma blobs that merge and burst with every beat.', moods: ['Dreamy', 'Vocal-Heavy'], gradient: 'linear-gradient(135deg, #e838dc 0%, #8b5cf6 100%)' },
   { id: 'fractal_kaleido', studio: 'fractal', previewStyle: 'fractal', name: 'Kaleidoscope', icon: <Palette className="size-4" />, description: 'Mirrored fractal patterns synced to music energy.', moods: ['Trippy', 'Instrumental'], gradient: 'linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%)' },
   { id: 'spectrum_bars',  studio: 'bars',    previewStyle: 'bars',    name: 'Spectrum Bars', icon: <Zap className="size-4" />,     description: 'Classic frequency bars — every beat, every frequency, instant.', moods: ['High-Energy', 'Vocal-Heavy'], gradient: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)' },
 ];
@@ -608,10 +608,24 @@ function EnginePreview({ style }: { style: string }) {
     </div>
   );
   if (style === 'spheres') return (
-    <div className="absolute inset-0">
-      {[{x:25,y:40,s:10,d:'0s'},{x:55,y:30,s:8,d:'.3s'},{x:75,y:55,s:7,d:'.6s'}].map((sp,i) => <div key={i} className="absolute rounded-full bg-white/70"
-        style={{ width:sp.s, height:sp.s, left:`${sp.x}%`, top:`${sp.y}%`, boxShadow:'0 0 8px 2px rgba(255,255,255,.5)', animation:`sphA 1.5s ease-in-out infinite alternate`, animationDelay:sp.d }} />)}
-      <style>{`@keyframes sphA{from{transform:translateY(0)scale(1)}to{transform:translateY(-6px)scale(1.2)}}`}</style>
+    <div className="absolute inset-0 overflow-hidden">
+      {/* Plasma blob preview — large soft blobs that drift and overlap */}
+      {[
+        {x:38,y:42,s:26,c:'rgba(232,56,220,0.85)',d:'0s'},
+        {x:58,y:38,s:22,c:'rgba(139,92,246,0.80)',d:'.55s'},
+        {x:50,y:60,s:20,c:'rgba(232,56,220,0.70)',d:'1.1s'},
+      ].map((b,i) => (
+        <div key={i} style={{
+          position:'absolute', borderRadius:'50%',
+          width:b.s, height:b.s,
+          left:`${b.x}%`, top:`${b.y}%`,
+          background: `radial-gradient(circle at 35% 35%, #fff 0%, ${b.c} 45%, transparent 70%)`,
+          filter:'blur(3px)',
+          animation:`blobA 2.2s ease-in-out infinite alternate`,
+          animationDelay:b.d,
+        }} />
+      ))}
+      <style>{`@keyframes blobA{from{transform:scale(1) translate(0,0)}to{transform:scale(1.25) translate(4px,-5px)}}`}</style>
     </div>
   );
   if (style === 'fractal') return (
