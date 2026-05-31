@@ -22,7 +22,7 @@ const MOOD_SCORES: Record<EngineId, Record<MoodLabel, number>> = {
   bars:         { aggressive: 0.75, euphoric: 0.55, calm: 0.45, dark: 0.45, bright: 0.70 },
   orbital:      { aggressive: 0.40, euphoric: 0.65, calm: 0.95, dark: 0.75, bright: 0.55 },
   terrain:      { aggressive: 0.35, euphoric: 0.40, calm: 0.90, dark: 0.85, bright: 0.40 },
-  solar:        { aggressive: 0.25, euphoric: 0.55, calm: 0.85, dark: 0.65, bright: 0.55 },
+  solar:        { aggressive: 0.85, euphoric: 0.70, calm: 0.40, dark: 0.60, bright: 0.75 },
 };
 
 // ─── BPM bonuses — large enough to actually change the ranking ────────────────
@@ -78,7 +78,7 @@ function buildReason(
     bars:         'spectrum bars reveal every frequency in the mix',
     orbital:      'orbital motion flows well with sustained ambient sound',
     terrain:      'terrain waves rise with bass and rhythm slowly',
-    solar:        'planetary orbits match gentle, evolving builds',
+    solar:        'geometric ring bursts fire hard on every drop and beat',
   };
   return `${mood} mood · ${bpmStr} · ${energyStr} — ${notes[id]}`;
 }
