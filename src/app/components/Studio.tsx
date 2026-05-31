@@ -99,6 +99,18 @@ const ENGINE_LABELS_SHORT: Record<string, string> = {
   terrain: 'Terrain', tunnel: 'Aurora', neon_spheres: 'Spheres', fractal: 'Fractal', solar: 'Pulse',
 };
 
+const ENGINE_COLORS: Record<string, { bg: string; border: string; text: string; chip: string; chipBorder: string; chipText: string }> = {
+  bars:         { bg: 'bg-cyan-500/15',    border: 'border-cyan-400/50',    text: 'text-cyan-300',    chip: 'bg-cyan-500/20',    chipBorder: 'border-cyan-400/40',    chipText: 'text-cyan-200'    },
+  radial:       { bg: 'bg-violet-500/15',  border: 'border-violet-400/50',  text: 'text-violet-300',  chip: 'bg-violet-500/20',  chipBorder: 'border-violet-400/40',  chipText: 'text-violet-200'  },
+  orbital:      { bg: 'bg-blue-500/15',    border: 'border-blue-400/50',    text: 'text-blue-300',    chip: 'bg-blue-500/20',    chipBorder: 'border-blue-400/40',    chipText: 'text-blue-200'    },
+  depth:        { bg: 'bg-indigo-500/15',  border: 'border-indigo-400/50',  text: 'text-indigo-300',  chip: 'bg-indigo-500/20',  chipBorder: 'border-indigo-400/40',  chipText: 'text-indigo-200'  },
+  terrain:      { bg: 'bg-emerald-500/15', border: 'border-emerald-400/50', text: 'text-emerald-300', chip: 'bg-emerald-500/20', chipBorder: 'border-emerald-400/40', chipText: 'text-emerald-200' },
+  tunnel:       { bg: 'bg-teal-500/15',    border: 'border-teal-400/50',    text: 'text-teal-300',    chip: 'bg-teal-500/20',    chipBorder: 'border-teal-400/40',    chipText: 'text-teal-200'    },
+  neon_spheres: { bg: 'bg-pink-500/15',    border: 'border-pink-400/50',    text: 'text-pink-300',    chip: 'bg-pink-500/20',    chipBorder: 'border-pink-400/40',    chipText: 'text-pink-200'    },
+  fractal:      { bg: 'bg-fuchsia-500/15', border: 'border-fuchsia-400/50', text: 'text-fuchsia-300', chip: 'bg-fuchsia-500/20', chipBorder: 'border-fuchsia-400/40', chipText: 'text-fuchsia-200' },
+  solar:        { bg: 'bg-amber-500/15',   border: 'border-amber-400/50',   text: 'text-amber-300',   chip: 'bg-amber-500/20',   chipBorder: 'border-amber-400/40',   chipText: 'text-amber-200'   },
+};
+
 // ── Per-engine optimal motion defaults ────────────────────────────────────────
 type MotionDefaults = { beatSensitivity: number; particleDensity: number; smoothing: number; baseSpeed: number; beatResponse: number };
 const ENGINE_MOTION_DEFAULTS: Record<string, MotionDefaults> = {
