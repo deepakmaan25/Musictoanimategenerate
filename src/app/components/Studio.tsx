@@ -88,7 +88,7 @@ const ENGINES: { id: EngineId; name: string; description: string; group: '2D' | 
   { id: 'depth',       name: 'Depth Field Particles', description: 'Cinematic starfield that surges on every beat.',        group: '3D' },
   { id: 'terrain',     name: 'Audio Terrain',         description: 'Wireframe landscape that reacts to every frequency.',  group: '3D' },
   { id: 'tunnel',      name: 'Liquid Aurora',         description: 'Flowing colour curtains that ripple with every frequency.',  group: '3D' },
-  { id: 'neon_spheres',name: 'Neon Spheres',          description: 'Glowing spheres wobbling and scaling with audio.',     group: '3D' },
+  { id: 'neon_spheres',name: 'Plasma Blobs',           description: 'Organic blobs that merge and split with every beat.',    group: '3D' },
   { id: 'fractal',     name: 'Fractal Kaleidoscope',  description: 'Mirrored tiling pattern; rotation tied to energy.',    group: '3D' },
   { id: 'solar',       name: 'Geometric Pulse',       description: 'Concentric beat rings expand and shatter on every drop.', group: '3D' },
 ];
@@ -96,7 +96,7 @@ const ENGINES: { id: EngineId; name: string; description: string; group: '2D' | 
 // ── Short engine name lookup for preset naming ─────────────────────────────
 const ENGINE_LABELS_SHORT: Record<string, string> = {
   bars: 'Bars', radial: 'Radial', orbital: 'Orbital', depth: 'Depth',
-  terrain: 'Terrain', tunnel: 'Aurora', neon_spheres: 'Spheres', fractal: 'Fractal', solar: 'Pulse',
+  terrain: 'Terrain', tunnel: 'Aurora', neon_spheres: 'Plasma', fractal: 'Fractal', solar: 'Pulse',
 };
 
 // ENGINE_COLORS uses inline CSS values (not Tailwind classes) to avoid purging in production
@@ -107,7 +107,7 @@ const ENGINE_COLORS: Record<string, { bg: string; border: string; text: string; 
   depth:        { bg: 'rgba(99,102,241,0.15)',  border: 'rgba(129,140,248,0.50)',  text: '#a5b4fc', chip: 'rgba(99,102,241,0.20)',  chipBorder: 'rgba(129,140,248,0.40)',  chipText: '#c7d2fe' },
   terrain:      { bg: 'rgba(16,185,129,0.15)',  border: 'rgba(52,211,153,0.50)',   text: '#6ee7b7', chip: 'rgba(16,185,129,0.20)',  chipBorder: 'rgba(52,211,153,0.40)',   chipText: '#a7f3d0' },
   tunnel:       { bg: 'rgba(20,184,166,0.15)',  border: 'rgba(45,212,191,0.50)',   text: '#5eead4', chip: 'rgba(20,184,166,0.20)',  chipBorder: 'rgba(45,212,191,0.40)',   chipText: '#99f6e4' },
-  neon_spheres: { bg: 'rgba(236,72,153,0.15)',  border: 'rgba(244,114,182,0.50)',  text: '#f9a8d4', chip: 'rgba(236,72,153,0.20)',  chipBorder: 'rgba(244,114,182,0.40)',  chipText: '#fbcfe8' },
+  neon_spheres: { bg: 'rgba(232,56,220,0.15)',  border: 'rgba(240,100,240,0.50)',  text: '#f0abfc', chip: 'rgba(232,56,220,0.20)',  chipBorder: 'rgba(240,100,240,0.40)',  chipText: '#fae8ff' },
   fractal:      { bg: 'rgba(217,70,239,0.15)',  border: 'rgba(232,121,249,0.50)',  text: '#f0abfc', chip: 'rgba(217,70,239,0.20)',  chipBorder: 'rgba(232,121,249,0.40)',  chipText: '#f5d0fe' },
   solar:        { bg: 'rgba(245,158,11,0.15)',  border: 'rgba(251,191,36,0.50)',   text: '#fcd34d', chip: 'rgba(245,158,11,0.20)',  chipBorder: 'rgba(251,191,36,0.40)',   chipText: '#fde68a' },
 };
@@ -119,7 +119,7 @@ const ENGINE_MOTION_DEFAULTS: Record<string, MotionDefaults> = {
   radial:       { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
   orbital:      { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
   depth:        { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
-  terrain:      { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.85, baseSpeed: 1.0, beatResponse: 0.90 },
+  terrain:      { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.75, baseSpeed: 1.0, beatResponse: 0.90 },
   tunnel:       { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
   neon_spheres: { beatSensitivity: 0.8, particleDensity: 0.97, smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
   fractal:      { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
@@ -171,10 +171,10 @@ const VARIANTS: Partial<Record<EngineId, { id: string; label: string; descriptio
     { id: 'ocean',     label: 'Ocean',     description: 'Rolling fluid waves — amplitude tied to bass' },
   ],
   neon_spheres: [
-    { id: 'float',  label: 'Float',  description: 'Freeform drifting spheres (default)' },
-    { id: 'orbit',  label: 'Orbit',  description: 'Spheres orbit a central glow point' },
-    { id: 'burst',  label: 'Burst',  description: 'All spheres explode from centre on every beat' },
-    { id: 'ring',   label: 'Ring',   description: 'Spheres locked in a rotating ring formation' },
+    { id: 'float',  label: 'Float',  description: 'Free drifting blobs — merge on proximity (default)' },
+    { id: 'orbit',  label: 'Orbit',  description: 'Blobs orbit the centre — corona erupts on every beat' },
+    { id: 'magma',  label: 'Magma',  description: 'Slow lava-lamp churn — bass stretches and splits the blobs' },
+    { id: 'pulse',  label: 'Pulse',  description: 'Blobs burst outward on every drop, snap back to formation' },
   ],
   fractal: [
     { id: 'kaleidoscope', label: 'Kaleidoscope', description: 'Mirrored radial burst lines (default)' },
@@ -1840,140 +1840,228 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
         ctx.shadowBlur = 0; ctx.globalAlpha = 1;
       }
     } else if (eng === 'neon_spheres') {
-      ctx.fillStyle = `rgba(2,2,10,${0.22 + (1 - sectionIntensity) * 0.08})`;
+      // ── Plasma Blobs — offscreen composite metaball technique ───────────
+      ctx.fillStyle = `rgba(2,2,10,${0.28 + (1 - sectionIntensity) * 0.09})`;
       ctx.fillRect(0, 0, w, h);
-      const bass = avg(freq, 0, 16), mids = avg(freq, 16, 80), highs = avg(freq, 80, 200);
 
-      // Beat onset for sphere pulse
-      const sphereOnset = Math.max(0, bass - prevBassRef.current);
+      const bass  = avg(freq, 0, 12);
+      const mids  = avg(freq, 12, 60);
+      const highs = avg(freq, 60, 180);
+      const energy = bass * 0.55 + mids * 0.30 + highs * 0.15;
+
+      const onset = Math.max(0, bass - prevBassRef.current);
       if (eng === 'neon_spheres') prevBassRef.current = bass;
-      const sphereBeat = sphereOnset > 0.05 ? sphereOnset : 0;
+      if (onset > 0.04) smoothedBurstRef.current = Math.min(1, smoothedBurstRef.current + onset * 2.8);
+      smoothedBurstRef.current *= 0.82;
+      const burst = smoothedBurstRef.current;
 
-      // Speed scales with section intensity — slow in breakdowns, lively in drops
-      const baseMotion = (0.008 + sectionIntensity * 0.016) * energyMult;
-      solarTRef.current += baseMotion;
+      solarTRef.current += (0.008 + energy * 0.022 * sens) * energyMult;
+      const t = solarTRef.current;
 
-      const N = 6;
-      if (spheresRef.current.length < N) {
+      // Initialise blobs
+      const N = vrnt === 'magma' ? 7 : vrnt === 'pulse' ? 8 : 6;
+      if (spheresRef.current.length !== N) {
         spheresRef.current = Array.from({ length: N }, (_, i) => ({
-          x: 0.15 + (i / (N - 1)) * 0.7,
-          y: 0.25 + Math.random() * 0.5,
-          vx: (Math.random() - 0.5) * 0.0015,
-          vy: (Math.random() - 0.5) * 0.0015,
+          x: 0.15 + (i / (N - 1)) * 0.70,
+          y: 0.20 + Math.random() * 0.60,
+          vx: (Math.random() - 0.5) * 0.0012,
+          vy: (Math.random() - 0.5) * 0.0012,
           phase: (i / N) * Math.PI * 2,
-          size: 0.022 + Math.random() * 0.022,   // was 0.045–0.09, halved
+          size: 0.055 + Math.random() * 0.040,
           hue: i / N,
         }));
       }
 
+      const minDim = Math.min(w, h);
       const bandStep = Math.floor(freq.length / N);
 
-      // Orbit variant: each sphere orbits the centre at its own radius
-      const orbitMode = vrnt === 'orbit';
-      const burstMode = vrnt === 'burst';
-      const orbitCx = 0.5, orbitCy = 0.5;
+      // Update blob positions per variant
+      for (let i = 0; i < N; i++) {
+        const sp  = spheresRef.current[i];
+        const be  = avg(freq, i * bandStep, i * bandStep + bandStep) * sens;
 
-      // Burst mode: track how far each sphere has flown from centre
-      if (burstMode && sphereBeat > 0.06 && spheresRef.current.length > 0) {
-        // On every beat, reset all spheres to centre with random outward velocity
-        for (let i = 0; i < N; i++) {
-          const sp = spheresRef.current[i];
-          const angle = (i / N) * Math.PI * 2 + Math.random() * 0.6;
-          const spd   = (0.008 + sphereBeat * 0.014) * (0.7 + Math.random() * 0.6);
-          sp.x = 0.5 + (Math.random() - 0.5) * 0.04;
-          sp.y = 0.5 + (Math.random() - 0.5) * 0.04;
-          sp.vx = Math.cos(angle) * spd;
-          sp.vy = Math.sin(angle) * spd;
+        if (vrnt === 'orbit') {
+          // Elliptical orbits — radius breathes with band energy
+          const baseR  = 0.14 + i * 0.042 * (1 + be * 0.35);
+          const speed  = (0.006 + energy * 0.014) * (0.7 + i * 0.18) * energyMult;
+          sp.phase    += speed;
+          sp.x = 0.5  + Math.cos(sp.phase) * baseR * (1.0 + be * 0.25);
+          sp.y = 0.5  + Math.sin(sp.phase) * baseR * 0.62 * (1.0 + bass * 0.20);
+        } else if (vrnt === 'magma') {
+          // Slow lava-lamp: strong vertical drift, gravity pull to centre on beat
+          const driftSpeed = (0.004 + energy * 0.008) * energyMult;
+          sp.x += sp.vx + Math.sin(t * 0.35 + sp.phase) * driftSpeed * 0.55;
+          sp.y += sp.vy + Math.cos(t * 0.28 + sp.phase * 1.4) * driftSpeed;
+          // Gentle centre-gravity
+          sp.vx += (0.5 - sp.x) * 0.00012;
+          sp.vy += (0.5 - sp.y) * 0.00008;
+          sp.vx *= 0.992; sp.vy *= 0.992;
+          sp.x = Math.max(0.06, Math.min(0.94, sp.x));
+          sp.y = Math.max(0.06, Math.min(0.94, sp.y));
+        } else if (vrnt === 'pulse') {
+          // Settle near home position, burst outward on beat
+          const homeX = 0.5 + Math.cos((i / N) * Math.PI * 2) * 0.22;
+          const homeY = 0.5 + Math.sin((i / N) * Math.PI * 2) * 0.22;
+          if (onset > 0.045 && burst > 0.3) {
+            const ang = (i / N) * Math.PI * 2 + Math.random() * 0.5;
+            sp.vx = Math.cos(ang) * (0.010 + onset * 0.018);
+            sp.vy = Math.sin(ang) * (0.010 + onset * 0.018);
+          }
+          sp.vx += (homeX - sp.x) * 0.018;
+          sp.vy += (homeY - sp.y) * 0.018;
+          sp.vx *= 0.88; sp.vy *= 0.88;
+          sp.x += sp.vx; sp.y += sp.vy;
+          sp.x = Math.max(0.04, Math.min(0.96, sp.x));
+          sp.y = Math.max(0.04, Math.min(0.96, sp.y));
+        } else {
+          // float: Lissajous-influenced free drift
+          const driftSpeed = (0.003 + energy * 0.010) * energyMult;
+          sp.x += sp.vx + Math.sin(t * 0.55 + sp.phase) * driftSpeed;
+          sp.y += sp.vy + Math.cos(t * 0.42 + sp.phase * 1.3) * driftSpeed;
+          if (sp.x <= 0.06 || sp.x >= 0.94) sp.vx *= -0.8;
+          if (sp.y <= 0.06 || sp.y >= 0.94) sp.vy *= -0.8;
+          sp.x = Math.max(0.06, Math.min(0.94, sp.x));
+          sp.y = Math.max(0.06, Math.min(0.94, sp.y));
         }
       }
 
+      // ── Offscreen composite pass for blob merge effect ─────────────────
+      // Draw all blobs onto a temp canvas with radial gradients,
+      // then use 'destination-in' against a threshold mask.
+      const OW = w, OH = h;
+      const offscreen = document.createElement('canvas');
+      offscreen.width = OW; offscreen.height = OH;
+      const oCtx = offscreen.getContext('2d', { alpha: true })!;
+
       for (let i = 0; i < N; i++) {
-        const sp  = spheresRef.current[i];
-        const be  = avg(freq, i * bandStep, (i + 1) * bandStep);
-
-        if (orbitMode) {
-          // Fixed orbital radius per sphere, speed modulated by energy
-          const orbitR = 0.12 + i * 0.06 * (0.8 + be * 0.4);
-          const orbitSpeed = baseMotion * (0.6 + i * 0.2) * (0.5 + sectionIntensity * 0.5);
-          sp.phase += orbitSpeed;
-          sp.x = orbitCx + Math.cos(sp.phase) * orbitR;
-          sp.y = orbitCy + Math.sin(sp.phase) * orbitR * 0.7;
-        } else if (burstMode) {
-          // Burst: fly outward then slowly drift back to centre
-          sp.vx *= 0.965;
-          sp.vy *= 0.965;
-          sp.x  += sp.vx;
-          sp.y  += sp.vy;
-          // Gentle pull back to centre when slow
-          const dx = 0.5 - sp.x, dy = 0.5 - sp.y;
-          sp.x += dx * 0.008;
-          sp.y += dy * 0.008;
-          sp.x = Math.max(0.04, Math.min(0.96, sp.x));
-          sp.y = Math.max(0.04, Math.min(0.96, sp.y));
-        } else if (vrnt === 'ring') {
-          // Ring: all spheres equally spaced in a rotating ring formation
-          const ringR     = 0.22 + be * 0.06 * (0.6 + sectionIntensity * 0.4);
-          const ringAngle = (i / N) * Math.PI * 2 + solarTRef.current * 0.55;
-          sp.x = 0.5 + Math.cos(ringAngle) * ringR;
-          sp.y = 0.5 + Math.sin(ringAngle) * ringR * 0.62; // slight ellipse for depth
-          sp.phase += baseMotion * 0.5;
-        } else {
-          // Float (default): freeform drift
-          const driftSpeed = baseMotion * 0.03;
-          sp.x += sp.vx + Math.sin(solarTRef.current * 0.6 + sp.phase) * driftSpeed;
-          sp.y += sp.vy + Math.cos(solarTRef.current * 0.45 + sp.phase * 1.3) * driftSpeed;
-          sp.x  = Math.max(0.07, Math.min(0.93, sp.x));
-          sp.y  = Math.max(0.07, Math.min(0.93, sp.y));
-          if (sp.x <= 0.07 || sp.x >= 0.93) sp.vx *= -1;
-          if (sp.y <= 0.07 || sp.y >= 0.93) sp.vy *= -1;
-        }
-
-        const sx = sp.x * w, sy = sp.y * h;
-        const minDim = Math.min(w, h);
-        // Size: band energy + beat pulse + section intensity — kept proportional, not screen-filling
-        const beatBoost = i === 0 ? (1 + sphereBeat * 1.5) : 1;
-        const r = sp.size * minDim * (1 + be * sens * 0.9) * (1 + bass * 0.15) * (0.7 + sectionIntensity * 0.3) * beatBoost;
+        const sp   = spheresRef.current[i];
+        const be   = avg(freq, i * bandStep, i * bandStep + bandStep) * sens;
+        const sx   = sp.x * OW;
+        const sy   = sp.y * OH;
+        const beatBoost = i < 2 ? (1 + burst * 0.55) : 1;
+        const r    = sp.size * minDim
+                     * (1 + be * 0.75 * (0.55 + sectionIntensity * 0.45))
+                     * (1 + bass * 0.12)
+                     * beatBoost;
         const color = liveColors[i % liveColors.length];
 
-        ctx.save();
-        ctx.shadowColor = color;
-        ctx.shadowBlur  = perf ? 0 : Math.min(24, (8 + be * 20 * sens) * (0.6 + sectionIntensity * 0.4));
-        // Outer glow layer (no radial gradient — uses shadowBlur which is already set)
-        ctx.globalAlpha = (0.45 + be * 0.35) * (0.6 + sectionIntensity * 0.4);
-        ctx.fillStyle   = color;
-        ctx.beginPath(); ctx.arc(sx, sy, r * 1.6, 0, Math.PI * 2); ctx.fill();
-        // Bright core highlight
-        ctx.globalAlpha = (0.75 + be * 0.25) * (0.7 + sectionIntensity * 0.3);
-        ctx.fillStyle   = '#ffffff';
-        ctx.beginPath(); ctx.arc(sx - r * 0.28, sy - r * 0.28, r * 0.22, 0, Math.PI * 2); ctx.fill();
+        // Core glow — large soft radial gradient
+        const gr = oCtx.createRadialGradient(sx, sy, 0, sx, sy, r * 2.2);
+        gr.addColorStop(0.0,  color);
+        gr.addColorStop(0.35, color);
+        gr.addColorStop(0.65, `rgba(${hexToRgb(color, hxCache)}, 0.45)`);
+        gr.addColorStop(1.0,  `rgba(${hexToRgb(color, hxCache)}, 0.00)`);
+        oCtx.globalAlpha   = 0.88 + be * 0.12;
+        oCtx.globalCompositeOperation = 'source-over';
+        oCtx.fillStyle     = gr;
+        oCtx.beginPath();
+        oCtx.arc(sx, sy, r * 2.2, 0, Math.PI * 2);
+        oCtx.fill();
 
-        // Specular highlight
-        if (highs > 0.3 && Math.random() < highs * 0.35) {
-          ctx.fillStyle = '#ffffff'; ctx.globalAlpha = highs * 0.65;
-          ctx.beginPath(); ctx.arc(sx - r * 0.3, sy - r * 0.3, r * 0.12, 0, Math.PI * 2); ctx.fill();
+        // Hard bright core
+        const cr = oCtx.createRadialGradient(sx, sy, 0, sx, sy, r * 0.55);
+        cr.addColorStop(0, '#ffffff');
+        cr.addColorStop(0.4, color);
+        cr.addColorStop(1,   `rgba(${hexToRgb(color, hxCache)}, 0)`);
+        oCtx.globalAlpha = 0.7 + be * 0.3;
+        oCtx.fillStyle   = cr;
+        oCtx.beginPath();
+        oCtx.arc(sx, sy, r * 0.55, 0, Math.PI * 2);
+        oCtx.fill();
+      }
+
+      // Threshold pass: keep only pixels above a certain brightness
+      // This creates the organic blob merge / "skin" where blobs overlap
+      const threshold = 0.38 + (1 - sectionIntensity) * 0.12;
+      const imageData = oCtx.getImageData(0, 0, OW, OH);
+      const d = imageData.data;
+      for (let px = 0; px < d.length; px += 4) {
+        const brightness = (d[px] * 0.299 + d[px+1] * 0.587 + d[px+2] * 0.114) / 255;
+        if (brightness < threshold) {
+          d[px+3] = 0; // transparent — cuts the merge gap, creates the skin
+        } else {
+          // Amplify brightness above threshold for crisp edges
+          const boost = Math.min(1, (brightness - threshold) / (1 - threshold) * 1.8);
+          d[px+3] = Math.round(boost * 255);
         }
+      }
+      oCtx.putImageData(imageData, 0, 0);
 
-        // In orbit mode: draw orbit path; in float/burst modes: connection lines between close spheres
-        if (orbitMode) {
-          // Draw faint orbit ring
-          const orbitR = (0.12 + i * 0.06) * Math.min(w, h);
-          ctx.strokeStyle = color; ctx.lineWidth = 0.5;
-          ctx.globalAlpha = 0.12 + be * 0.15;
-          ctx.beginPath(); ctx.ellipse(w * orbitCx, h * orbitCy, orbitR, orbitR * 0.7, 0, 0, Math.PI * 2); ctx.stroke();
-        } else if (sectionIntensity > 0.5) {
+      // Composite the blobs onto the main canvas with glow
+      ctx.save();
+      ctx.shadowColor = liveColors[0];
+      ctx.shadowBlur  = perf ? 0 : 18 + burst * 28;
+      ctx.globalAlpha = 1;
+      ctx.drawImage(offscreen, 0, 0);
+      ctx.restore();
+
+      // ── Specular highlights — one sharp dot per blob ───────────────────
+      if (!perf) {
+        for (let i = 0; i < N; i++) {
+          const sp   = spheresRef.current[i];
+          const be   = avg(freq, i * bandStep, i * bandStep + bandStep) * sens;
+          const r    = sp.size * minDim * (1 + be * 0.75) * (1 + bass * 0.12);
+          const sx   = sp.x * w - r * 0.30;
+          const sy   = sp.y * h - r * 0.30;
+          const color = liveColors[i % liveColors.length];
+          ctx.globalAlpha = 0.45 + be * 0.45;
+          ctx.fillStyle   = '#ffffff';
+          ctx.shadowColor = '#ffffff';
+          ctx.shadowBlur  = 4;
+          ctx.beginPath();
+          ctx.arc(sx, sy, Math.max(1, r * 0.12), 0, Math.PI * 2);
+          ctx.fill();
+          // Second dimmer highlight
+          ctx.globalAlpha = 0.18 + be * 0.15;
+          ctx.shadowBlur  = 0;
+          ctx.fillStyle   = color;
+          ctx.beginPath();
+          ctx.arc(sp.x * w + r * 0.20, sp.y * h - r * 0.10, Math.max(1, r * 0.06), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+      }
+
+      // ── Connecting threads (float + magma only at high energy) ─────────
+      if ((vrnt === 'float' || vrnt === 'magma') && sectionIntensity > 0.45 && !perf) {
+        for (let i = 0; i < N; i++) {
           for (let j = i + 1; j < N; j++) {
-            const sp2 = spheresRef.current[j];
-            const dist = Math.hypot(sp.x - sp2.x, sp.y - sp2.y);
-            if (dist < 0.22) {
-              const lineAlpha = (0.22 - dist) / 0.22 * 0.4 * sectionIntensity;
-              ctx.strokeStyle = color; ctx.lineWidth = 0.8;
-              ctx.globalAlpha = lineAlpha;
-              ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sp2.x * w, sp2.y * h); ctx.stroke();
+            const a = spheresRef.current[i];
+            const b = spheresRef.current[j];
+            const dist = Math.hypot(a.x - b.x, a.y - b.y);
+            if (dist < 0.28) {
+              const prox = 1 - dist / 0.28;
+              const color = liveColors[i % liveColors.length];
+              const grd = ctx.createLinearGradient(a.x*w, a.y*h, b.x*w, b.y*h);
+              grd.addColorStop(0,   `rgba(${hexToRgb(color, hxCache)}, ${prox * 0.6})`);
+              grd.addColorStop(0.5, `rgba(${hexToRgb(liveColors[j % liveColors.length], hxCache)}, ${prox * 0.8})`);
+              grd.addColorStop(1,   `rgba(${hexToRgb(liveColors[j % liveColors.length], hxCache)}, ${prox * 0.6})`);
+              ctx.strokeStyle = grd;
+              ctx.lineWidth   = prox * prox * 3.5 * (1 + mids * 1.5);
+              ctx.globalAlpha = prox * 0.55 * sectionIntensity;
+              ctx.lineCap     = 'round';
+              ctx.beginPath();
+              ctx.moveTo(a.x * w, a.y * h);
+              ctx.lineTo(b.x * w, b.y * h);
+              ctx.stroke();
             }
           }
         }
-        ctx.restore();
+        ctx.globalAlpha = 1;
       }
+
+      // ── Beat flash halo (orbit + pulse) ───────────────────────────────
+      if ((vrnt === 'orbit' || vrnt === 'pulse') && burst > 0.25) {
+        const haloR = minDim * (0.30 + burst * 0.22);
+        const hGrad = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, haloR);
+        hGrad.addColorStop(0,   `rgba(${hexToRgb(liveColors[0], hxCache)}, ${burst * 0.18})`);
+        hGrad.addColorStop(0.6, `rgba(${hexToRgb(liveColors[1], hxCache)}, ${burst * 0.06})`);
+        hGrad.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.fillStyle = hGrad;
+        ctx.globalAlpha = 1;
+        ctx.beginPath(); ctx.arc(w/2, h/2, haloR, 0, Math.PI * 2); ctx.fill();
+      }
+
       ctx.globalAlpha = 1; ctx.shadowBlur = 0;
 
     // ── Fractal Kaleidoscope (new) ────────────────────────────────────────
