@@ -226,4 +226,20 @@
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
   }
+
+  /* ── Keyboard focus ring — visible only on keyboard nav ── */
+  :focus-visible {
+    outline: 2px solid rgba(168, 85, 247, 0.80);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  button:focus-visible, [role="button"]:focus-visible {
+    outline: 2px solid rgba(168, 85, 247, 0.80);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline: 2px solid rgba(168, 85, 247, 0.70);
+    outline-offset: 0;
+  }
 }
