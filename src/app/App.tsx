@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Upload, Sparkles, Wand2, Play, Download, Music, Palette, Layers, Zap,
@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight, FolderOpen, ExternalLink, FileVideo, Loader2
 } from 'lucide-react';
 import { Button } from './components/ui/button';
-import { Studio } from './components/Studio';
+const Studio = lazy(() => import('./components/Studio').then(m => ({ default: m.Studio })));
 import { AuthModal } from './components/AuthModal';
 import { AuthCallback } from './components/AuthCallback';
 import { SharePage } from './components/SharePage';
@@ -34,6 +34,18 @@ const ENGINES: {
 ];
 
 const PROJECTS_PER_PAGE = 6;
+
+function StudioLoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center"
+      style={{ background: 'var(--hero-bg-gradient)', color: 'var(--text-muted)' }}>
+      <div className="flex flex-col items-center gap-3">
+        <Loader2 className="size-6 animate-spin" />
+        <span className="text-sm">Loading studio…</span>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   if (typeof window !== 'undefined' && window.location.pathname === '/auth/callback') return <AuthCallback />;
@@ -120,7 +132,11 @@ function LandingApp() {
   const pagedProjects = projectList.slice(projectPage * PROJECTS_PER_PAGE, (projectPage + 1) * PROJECTS_PER_PAGE);
 
   if (view === 'studio') {
-    return <Studio initialFile={pendingFile} initialEngine={studioEngine} projectId={activeProjectId} persist={persist} onBack={() => setView('landing')} />;
+    return (
+      <Suspense fallback={<StudioLoadingFallback />}>
+        <Studio initialFile={pendingFile} initialEngine={studioEngine} projectId={activeProjectId} persist={persist} onBack={() => setView('landing')} />
+      </Suspense>
+    );
   }
 
   const isDark = theme === 'dark';
