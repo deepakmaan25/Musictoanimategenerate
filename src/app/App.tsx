@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from './components/ui/button';
 const Studio = lazy(() => import('./components/Studio').then(m => ({ default: m.Studio })));
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthModal } from './components/AuthModal';
 import { AuthCallback } from './components/AuthCallback';
 import { SharePage } from './components/SharePage';
@@ -133,9 +134,11 @@ function LandingApp() {
 
   if (view === 'studio') {
     return (
-      <Suspense fallback={<StudioLoadingFallback />}>
-        <Studio initialFile={pendingFile} initialEngine={studioEngine} projectId={activeProjectId} persist={persist} onBack={() => setView('landing')} />
-      </Suspense>
+      <ErrorBoundary onReset={() => setView('landing')}>
+        <Suspense fallback={<StudioLoadingFallback />}>
+          <Studio initialFile={pendingFile} initialEngine={studioEngine} projectId={activeProjectId} persist={persist} onBack={() => setView('landing')} />
+        </Suspense>
+      </ErrorBoundary>
     );
   }
 
