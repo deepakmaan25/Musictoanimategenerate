@@ -2856,7 +2856,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
     }
   } 
 
-   const reloadProjectAudio = async (projId: string) => {
+   async function reloadProjectAudio(projId: string) {
     setStatus('decoding');
     try {
       // 1. Get track metadata from DB
@@ -2907,7 +2907,7 @@ if (dbExports.length > 0) {
       // Non-fatal — just show idle so user can re-upload
       setStatus('idle');
     }
-  };
+  }
   
   
   const play = async () => {
