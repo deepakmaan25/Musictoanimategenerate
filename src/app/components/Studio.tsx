@@ -82,6 +82,8 @@ type Sphere = { x: number; y: number; vx: number; vy: number; phase: number; siz
 type ResonanceNode = { x: number; y: number; hx: number; hy: number; driftA: number; driftR: number;
   driftSpd: number; phase: number; depth: number; hue: number; twinkle: number; };
 type Planet = { angle: number; speed: number; dist: number; size: number; color: number };
+type GridDot = { bx: number; by: number; x: number; y: number; d: number };
+type Shockwave = { r: number; maxR: number; speed: number; width: number; strength: number; colorIdx: number };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const ENGINES: { id: EngineId; name: string; description: string; group: '2D' | '3D' }[] = [
@@ -162,10 +164,8 @@ const VARIANTS: Partial<Record<EngineId, { id: string; label: string; descriptio
     { id: 'wave',     label: 'Wave',     description: 'Concentric sine waves ripple outward from centre' },
   ],
   solar: [
-    { id: 'circle', label: 'Circle',  description: 'Smooth circular expanding rings (default)' },
-    { id: 'hex',    label: 'Hex',     description: 'Hexagonal rings on every beat' },
-    { id: 'square', label: 'Square',  description: 'Square rings that rotate on beat' },
-    { id: 'nova',   label: 'Nova',    description: 'Starburst spikes + rings detonate on every drop' },
+    { id: 'radial', label: 'Radial',  description: 'Shockwaves ripple through concentric dot rings (default)' },
+    { id: 'square', label: 'Grid',    description: 'Shockwaves ripple through a square dot grid' },
   ],
   terrain: [
     { id: 'wireframe', label: 'Wireframe', description: 'Mesh grid lines (default)' },
@@ -379,6 +379,9 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
   const tunnelTRef = useRef(0);
   const cameraTRef = useRef(0);
   const solarTRef  = useRef(0);
+  const gridDotsRef   = useRef<GridDot[]>([]);
+  const shockwavesRef = useRef<Shockwave[]>([]);
+  const gridKeyRef    = useRef<string>('');
   const recorderRef = useRef<MediaRecorder | null>(null);
   const pendingUploadRef = useRef<{ file: File; audioMeta: { name: string; duration: number; sampleRate?: number }; engineId: string } | null>(null);
 
@@ -1997,316 +2000,148 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
 
     // ── Solar System (new) ────────────────────────────────────────────────
     } else if (eng === 'solar') {
-      // ── Geometric Pulse — layered concentric beat system ─────────────
+      // ── Geometric Pulse — concentric shockwave grid ──────────────────────
+      // A field of dots; each beat fires an expanding shockwave that ripples
+      // through the grid, snapping dots brighter/larger as the front passes.
+      // Overlapping waves interfere. Clean rotating polygon core anchors center.
+      // Punchy: sharp wavefront, fast settle. No shadowBlur — additive glow.
       const bass = avg(freq, 0, 16), mids = avg(freq, 16, 80), highs = avg(freq, 80, 200);
-      solarTRef.current += (0.006 + bass * 0.018 * sens) * energyMult;
+      solarTRef.current += (0.4 + bass * 0.6 * sens) * 0.016 * energyMult;
       const t = solarTRef.current;
       const cx = w / 2, cy = h / 2;
       const minDim = Math.min(w, h);
+      const spacing = minDim / 16;
+      const gridRadial = vrnt !== 'square';  // default ('') and 'radial' → radial grid; only 'square' → square grid
 
-      // Beat onset
       const geoOnset = Math.max(0, bass - prevBassRef.current);
-      if (eng === 'solar') prevBassRef.current = bass;
-      if (geoOnset > 0.05) smoothedBurstRef.current = Math.min(1, smoothedBurstRef.current + geoOnset * 2.5);
-      smoothedBurstRef.current *= 0.84;
+      prevBassRef.current = bass;
+      if (geoOnset > 0.05) smoothedBurstRef.current = Math.min(1, smoothedBurstRef.current + (0.6 + geoOnset * 2.0));
+      smoothedBurstRef.current *= 0.84;                       // punchy decay
       const burst = smoothedBurstRef.current;
 
-      // Variant shape config
-      const sides = vrnt === 'square' ? 4 : vrnt === 'hex' ? 6 : 0;
-
-      // Shape helper — polygon or circle, centred on cx/cy
-      const drawShape = (r: number, rot = 0, n = sides) => {
-        if (n === 0) { ctx.arc(cx, cy, r, 0, Math.PI * 2); return; }
-        for (let s = 0; s <= n; s++) {
-          const a = (s / n) * Math.PI * 2 + rot;
-          s === 0 ? ctx.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r)
-                  : ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
-        }
-      };
-
-      // ── 1. Background ─────────────────────────────────────────────
-      if (vrnt === 'nova') {
-        // ── Nova: starburst spikes + rings detonate on every drop ────────
-        ctx.fillStyle = `rgba(2,2,10,${0.26 + (1 - sectionIntensity) * 0.10})`;
-        ctx.fillRect(0, 0, w, h);
-
-        // Spawn nova burst on strong beat
-        if (geoOnset > 0.048 && planetsRef.current.length < 24) {
-          const spikeN = perf ? 8 : 14;
-          planetsRef.current.push({ type: 'nova', r: minDim * 0.04,
-            maxR: minDim * (0.38 + geoOnset * 0.42) * (0.6 + sectionIntensity * 0.4),
-            alpha: Math.min(1, 0.6 + geoOnset * 1.8), colorIdx: Math.floor(Math.random() * liveColors.length),
-            spikeN, rot: t * 0.1, thickness: 2 + geoOnset * 7 } as any);
-          // Particle burst
-          const pN = perf ? 8 : 18;
-          for (let p = 0; p < pN && (sparksRef.current as any[]).length < 140; p++) {
-            const ang = Math.random() * Math.PI * 2;
-            const spd = (3 + Math.random() * 5 + geoOnset * 5) * (0.5 + sectionIntensity * 0.5);
-            (sparksRef.current as any[]).push({ x: cx, y: cy, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
-              life: 0.9 + Math.random() * 0.1, colorIdx: Math.floor(Math.random() * liveColors.length),
-              size: 2 + Math.random() * 3 + geoOnset * 4 });
+      // ── Lazy-build dot grid (rebuilds if size/topology changes) ─────────
+      const gridKey = `${Math.round(w)}x${Math.round(h)}|${gridRadial ? 'r' : 's'}`;
+      if (gridKeyRef.current !== gridKey) {
+        gridKeyRef.current = gridKey;
+        const arr: GridDot[] = [];
+        if (!gridRadial) {
+          const cols = Math.ceil(w / spacing) + 2, rows = Math.ceil(h / spacing) + 2;
+          const ox = (w - (cols - 1) * spacing) / 2, oy = (h - (rows - 1) * spacing) / 2;
+          for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+            const x = ox + c * spacing, y = oy + r * spacing;
+            arr.push({ bx: x, by: y, x, y, d: Math.hypot(x - cx, y - cy) });
+          }
+        } else {
+          arr.push({ bx: cx, by: cy, x: cx, y: cy, d: 0 });
+          const rings = 10;
+          for (let ri = 1; ri <= rings; ri++) {
+            const rr = ri * spacing, n = Math.max(6, ri * 6);
+            for (let k = 0; k < n; k++) {
+              const a = (k / n) * Math.PI * 2;
+              const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+              arr.push({ bx: x, by: y, x, y, d: rr });
+            }
           }
         }
+        gridDotsRef.current = arr;
+      }
+      const dots = gridDotsRef.current;
 
-        // Draw nova bursts
-        planetsRef.current = (planetsRef.current as any[]).filter((n: any) => {
-          n.r     += (4 + mids * 8 * sens) * energyMult;
-          n.alpha *= 0.905;
-          if (n.alpha < 0.012 || n.r > n.maxR * 1.2) return false;
-          const color = liveColors[n.colorIdx % liveColors.length];
-          const sN    = n.spikeN ?? 12;
-          ctx.save();
-          ctx.translate(cx, cy);
-          // Ring
-          ctx.strokeStyle = color; ctx.lineWidth = n.thickness * n.alpha * 2.2;
-          ctx.globalAlpha = n.alpha; ctx.shadowColor = color; ctx.shadowBlur = 14 + burst * 22;
-          ctx.beginPath(); ctx.arc(0, 0, n.r, 0, Math.PI * 2); ctx.stroke();
-          // Spikes at ring perimeter
-          for (let k = 0; k < sN; k++) {
-            const ang = (k / sN) * Math.PI * 2 + n.rot;
-            const inner = n.r * 0.88, outer = n.r + minDim * 0.05 * n.alpha;
-            ctx.strokeStyle = color; ctx.lineWidth = 1.2 + n.alpha * 2.5;
-            ctx.globalAlpha = n.alpha * 0.85; ctx.shadowBlur = 8 + n.alpha * 14;
-            ctx.beginPath();
-            ctx.moveTo(Math.cos(ang) * inner, Math.sin(ang) * inner);
-            ctx.lineTo(Math.cos(ang) * outer, Math.sin(ang) * outer);
-            ctx.stroke();
-          }
-          ctx.restore();
-          return true;
+      // ── Spawn shockwave on beat ─────────────────────────────────────────
+      if (geoOnset > 0.05) {
+        const strength = Math.min(1, 0.6 + geoOnset * 1.6);
+        shockwavesRef.current.push({
+          r: minDim * 0.02, maxR: minDim * 0.85,
+          speed: minDim * (0.012 + strength * 0.010), width: spacing * 1.8,
+          strength, colorIdx: Math.floor(Math.random() * liveColors.length),
         });
+        if (shockwavesRef.current.length > 10) shockwavesRef.current.shift();
+      }
+      // advance + cull waves
+      for (const wv of shockwavesRef.current) { wv.r += wv.speed; wv.strength *= 0.992; }
+      shockwavesRef.current = shockwavesRef.current.filter(wv => wv.r < wv.maxR && wv.strength > 0.05);
+      const waves = shockwavesRef.current;
 
-        // Particles
-        sparksRef.current = (sparksRef.current as any[]).filter((p: any) => {
-          p.x += p.vx; p.y += p.vy; p.vx *= 0.960; p.vy *= 0.960; p.life *= 0.932;
-          if (p.life < 0.018) return false;
-          const color = liveColors[p.colorIdx % liveColors.length];
-          ctx.fillStyle = color; ctx.globalAlpha = p.life * (0.55 + sectionIntensity * 0.45);
-          ctx.shadowColor = color; ctx.shadowBlur = p.size * 3;
-          ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); ctx.fill();
-          return true;
-        });
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-
-        // 4 ambient frequency rings (always visible, no beat needed)
-        for (let i = 0; i < 4; i++) {
-          const bandV = avg(freq, i * 18, i * 18 + 18);
-          const r     = minDim * (0.10 + i * 0.078) * (1 + bandV * sens * 0.35);
-          const color = liveColors[i % liveColors.length];
-          ctx.strokeStyle = color; ctx.lineWidth = 1.2 + bandV * 3.5;
-          ctx.globalAlpha = 0.20 + bandV * 0.55;
-          ctx.shadowColor = color; ctx.shadowBlur = 5 + bandV * 18;
-          ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
-        }
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-
-        // Core
-        const nCoreR = minDim * 0.05 * (1 + burst * 0.6);
-        const nCoreG = ctx.createRadialGradient(cx, cy, 0, cx, cy, nCoreR);
-        nCoreG.addColorStop(0, '#ffffff'); nCoreG.addColorStop(0.3, liveColors[0]); nCoreG.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = nCoreG; ctx.globalAlpha = 0.9 + burst * 0.1;
-        ctx.shadowColor = liveColors[0]; ctx.shadowBlur = 18 + burst * 28;
-        ctx.beginPath(); ctx.arc(cx, cy, nCoreR, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-
-      } else {
-      // ── 1. Background ─────────────────────────────────────────────
-      ctx.fillStyle = `rgba(2,2,10,${0.32 + (1 - sectionIntensity) * 0.10})`;
+      // ── Background trail fade ───────────────────────────────────────────
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = `rgba(3,3,10,${0.30 + (1 - sectionIntensity) * 0.08})`;
       ctx.fillRect(0, 0, w, h);
 
-      // Ambient pulse — wide, very transparent radial bloom
-      const ambR   = minDim * (0.58 + burst * 0.14 + currentEnergy * 0.11);
-      const ambGrd = ctx.createRadialGradient(cx, cy, 0, cx, cy, ambR);
-      ambGrd.addColorStop(0,   `rgba(${hexToRgb(liveColors[1], hxCache)}, ${0.08 + burst * 0.09})`);
-      ambGrd.addColorStop(0.6, `rgba(${hexToRgb(liveColors[2], hxCache)}, ${0.03 + sectionIntensity * 0.03})`);
-      ambGrd.addColorStop(1,   'rgba(0,0,0,0)');
-      ctx.fillStyle = ambGrd;
-      ctx.beginPath(); ctx.arc(cx, cy, ambR, 0, Math.PI * 2); ctx.fill();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.shadowBlur = 0;
 
-      // ── 2. Frequency spectrum ring ────────────────────────────────
-      // 64 outward spikes at inner radius — like a polar spectrum chart
-      if (!perf) {
-        const specR  = minDim * 0.145;
-        const specN  = 64;
-        const specStep = Math.max(1, Math.floor(freq.length * 0.5 / specN));
-        ctx.save();
-        for (let i = 0; i < specN; i++) {
-          const v     = (freq[i * specStep] / 255) * sens;
-          if (v < 0.04) continue;
-          const angle = (i / specN) * Math.PI * 2 - Math.PI / 2;
-          const spike = v * minDim * 0.10 * (0.5 + sectionIntensity * 0.5);
-          const color = liveColors[i % liveColors.length];
-          ctx.strokeStyle = color;
-          ctx.lineWidth   = 2 + v * 3;
-          ctx.globalAlpha = 0.30 + v * 0.70;
-          ctx.shadowColor = color; ctx.shadowBlur = 3 + v * 10;
-          ctx.beginPath();
-          ctx.moveTo(cx + Math.cos(angle) * specR, cy + Math.sin(angle) * specR);
-          ctx.lineTo(cx + Math.cos(angle) * (specR + spike), cy + Math.sin(angle) * (specR + spike));
-          ctx.stroke();
-        }
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-        ctx.restore();
-      }
-
-      // ── 3. Spawn beat rings + particle burst ─────────────────────
-      if (!planetsRef.current) planetsRef.current = [];
-      if (!sparksRef.current)  sparksRef.current  = [];
-
-      if (geoOnset > 0.055) {
-        if (planetsRef.current.length < 28) {
-          planetsRef.current.push({
-            r:        minDim * 0.045,
-            maxR:     minDim * (0.32 + geoOnset * 0.40) * (0.65 + sectionIntensity * 0.35),
-            alpha:    Math.min(0.98, geoOnset * 2.6),
-            colorIdx: Math.floor(Math.random() * liveColors.length),
-            sides,
-            thickness: 2.5 + geoOnset * 8,
-            type:     'ring',
-          } as any);
-        }
-        // Particle burst: outward flying sparks
-        const pCount = perf ? 5 : Math.floor(10 + geoOnset * 22);
-        for (let p = 0; p < pCount && (sparksRef.current as any[]).length < 140; p++) {
-          const angle = Math.random() * Math.PI * 2;
-          const spd   = (2 + Math.random() * 4 + geoOnset * 5) * (0.5 + sectionIntensity * 0.5);
-          (sparksRef.current as any[]).push({
-            x: cx + (Math.random() - 0.5) * 8,
-            y: cy + (Math.random() - 0.5) * 8,
-            vx: Math.cos(angle) * spd,
-            vy: Math.sin(angle) * spd,
-            life: 0.88 + Math.random() * 0.12,
-            colorIdx: Math.floor(Math.random() * liveColors.length),
-            size: 1.8 + Math.random() * 2.8 + geoOnset * 3.5,
-          });
-        }
-      }
-
-      // ── 4. Expand and draw beat rings ─────────────────────────────
-      planetsRef.current = (planetsRef.current as any[]).filter((ring: any) => {
-        ring.r     += (3.5 + mids * 9 * sens) * energyMult;
-        ring.alpha *= 0.91;
-        if (ring.alpha < 0.014 || ring.r > ring.maxR * 1.25) return false;
-
-        const color = liveColors[ring.colorIdx % liveColors.length];
-        const rot   = t * 0.22;
-        ctx.save();
-        // Outer glow stroke
-        ctx.strokeStyle = color;
-        ctx.lineWidth   = ring.thickness * ring.alpha * 2.4;
-        ctx.globalAlpha = ring.alpha;
-        ctx.shadowColor = color; ctx.shadowBlur = 16 + burst * 24;
-        ctx.beginPath(); drawShape(ring.r, rot, ring.sides); ctx.stroke();
-        // Subtle fill bloom on the ring interior
-        ctx.globalAlpha = ring.alpha * 0.12;
-        ctx.fillStyle   = color; ctx.shadowBlur = 0;
-        ctx.beginPath(); drawShape(ring.r * 0.90, rot, ring.sides); ctx.fill();
-        ctx.restore();
-        return true;
-      });
-      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-
-      // ── 5. Particles ──────────────────────────────────────────────
-      sparksRef.current = (sparksRef.current as any[]).filter((p: any) => {
-        p.x  += p.vx; p.y  += p.vy;
-        p.vx *= 0.960; p.vy *= 0.960;
-        p.life *= 0.934;
-        if (p.life < 0.018) return false;
-        const color = liveColors[p.colorIdx % liveColors.length];
-        ctx.fillStyle = color;
-        ctx.globalAlpha = p.life * (0.55 + sectionIntensity * 0.45);
-        ctx.shadowColor = color; ctx.shadowBlur = p.size * 3.5;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); ctx.fill();
-        return true;
-      });
-      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-
-      // ── 6. Standing rings — filled + stroked + glowing ────────────
-      const standingCount = perf ? 4 : 6;
-      for (let i = 0; i < standingCount; i++) {
-        const t2      = (i + 1) / (standingCount + 1);
-        const freqLo  = Math.floor(t2 * freq.length * 0.45);
-        const bandVal = avg(freq, freqLo, freqLo + 12);
-        const baseR   = minDim * (0.115 + i * 0.082);
-        const liveR   = baseR * (1 + bandVal * sens * 0.38 * (0.4 + sectionIntensity * 0.6));
-        const color   = liveColors[i % liveColors.length];
-        const rot     = sides === 0 ? 0 : t * 0.11 + i * (Math.PI / Math.max(sides, 1));
-
-        ctx.save();
-        // Glow stroke
-        ctx.strokeStyle = color;
-        ctx.lineWidth   = 1.8 + bandVal * 5.5;
-        ctx.globalAlpha = 0.30 + bandVal * 0.70;
-        ctx.shadowColor = color;
-        ctx.shadowBlur  = 10 + bandVal * 24 + (i === 0 ? burst * 16 : 0);
-        ctx.beginPath(); drawShape(liveR, rot); ctx.stroke();
-
-        // Fill — makes rings look solid, not just outlines
-        ctx.globalAlpha = (0.05 + bandVal * 0.10) * (0.5 + sectionIntensity * 0.5);
-        ctx.fillStyle   = color; ctx.shadowBlur = 0;
-        ctx.beginPath(); drawShape(liveR, rot); ctx.fill();
-
-        // Vertex highlight dots for polygon variants
-        if (sides > 0 && bandVal > 0.28 && !perf) {
-          for (let v2 = 0; v2 < sides; v2++) {
-            const a = (v2 / sides) * Math.PI * 2 + rot;
-            const hx = cx + Math.cos(a) * liveR;
-            const hy = cy + Math.sin(a) * liveR;
-            ctx.fillStyle   = '#ffffff';
-            ctx.globalAlpha = bandVal * 0.6 * (i === standingCount - 1 ? 1 : 0.4);
-            ctx.shadowColor = color; ctx.shadowBlur = 5 + bandVal * 12;
-            ctx.beginPath(); ctx.arc(hx, hy, 1.8 + bandVal * 3.5, 0, Math.PI * 2); ctx.fill();
+      // ── Draw dots displaced/brightened by passing shockwaves ────────────
+      for (let di = 0; di < dots.length; di++) {
+        const dot = dots[di];
+        let push = 0, bright = 0;
+        for (let wi = 0; wi < waves.length; wi++) {
+          const wv = waves[wi];
+          const diff = Math.abs(dot.d - wv.r);
+          if (diff < wv.width) {
+            const f = 1 - diff / wv.width;
+            const e = f * f * wv.strength;       // sharp leading edge
+            push += e * spacing * 0.45;
+            bright += e;
           }
         }
-        ctx.restore();
-      }
-      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        if (bright > 1.4) bright = 1.4;
+        const shimmer = 0.10 + 0.10 * Math.sin(dot.d * 0.03 - t * 3) * mids;
+        const a = 0.06 + shimmer + bright * 0.9;
+        const ang = Math.atan2(dot.by - cy, dot.bx - cx);
+        dot.x = dot.bx + Math.cos(ang) * push;
+        dot.y = dot.by + Math.sin(ang) * push;
 
-      // ── 7. Light rays on strong beats ─────────────────────────────
-      if (burst > 0.28 && !perf) {
-        const rayN   = sides > 0 ? sides * 2 : 12;
-        const rayLen = minDim * (0.38 + burst * 0.22);
-        ctx.save();
-        for (let r2 = 0; r2 < rayN; r2++) {
-          const angle = (r2 / rayN) * Math.PI * 2 + t * 0.07;
-          const color = liveColors[r2 % liveColors.length];
-          const grd   = ctx.createLinearGradient(
-            cx, cy,
-            cx + Math.cos(angle) * rayLen,
-            cy + Math.sin(angle) * rayLen,
-          );
-          grd.addColorStop(0, `rgba(${hexToRgb(color, hxCache)}, ${(burst - 0.28) * 0.60})`);
-          grd.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.strokeStyle = grd;
-          ctx.lineWidth   = 0.8 + burst * 2.8;
-          ctx.globalAlpha = burst * 0.85;
-          ctx.beginPath(); ctx.moveTo(cx, cy);
-          ctx.lineTo(cx + Math.cos(angle) * rayLen, cy + Math.sin(angle) * rayLen);
-          ctx.stroke();
+        if (a <= 0.02) continue;
+        const col = liveColors[Math.floor(dot.d / spacing) % liveColors.length];
+        const rgbCol = hexToRgb(col, hxCache);
+        const size = 1.3 + bright * 3.2 + (bright > 0.5 ? bright * 1.5 : 0);
+        if (bright > 0.12 && !perf) {
+          const g = ctx.createRadialGradient(dot.x, dot.y, 0, dot.x, dot.y, size * 3.2);
+          g.addColorStop(0, `rgba(${rgbCol},${bright * 0.5})`);
+          g.addColorStop(1, `rgba(${rgbCol},0)`);
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(dot.x, dot.y, size * 3.2, 0, Math.PI * 2); ctx.fill();
         }
-        ctx.restore(); ctx.globalAlpha = 1;
+        ctx.fillStyle = `rgba(${rgbCol},${a})`;
+        ctx.beginPath(); ctx.arc(dot.x, dot.y, size, 0, Math.PI * 2); ctx.fill();
+        if (bright > 0.6) {
+          ctx.fillStyle = `rgba(255,255,255,${(bright - 0.6) * 0.9})`;
+          ctx.beginPath(); ctx.arc(dot.x, dot.y, size * 0.5, 0, Math.PI * 2); ctx.fill();
+        }
       }
 
-      // ── 8. Multi-layer core glow ──────────────────────────────────
-      const coreR = minDim * 0.058 * (1 + burst * 0.55 + bass * sens * 0.28);
-      // Wide outer halo
-      const haloGrd = ctx.createRadialGradient(cx, cy, coreR * 0.4, cx, cy, coreR * 4.8);
-      haloGrd.addColorStop(0, `rgba(${hexToRgb(liveColors[1], hxCache)}, ${0.14 + burst * 0.18})`);
-      haloGrd.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = haloGrd;
-      ctx.beginPath(); ctx.arc(cx, cy, coreR * 4.8, 0, Math.PI * 2); ctx.fill();
-      // Bright core
-      const coreGrd = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-      coreGrd.addColorStop(0,    '#ffffff');
-      coreGrd.addColorStop(0.22, liveColors[0]);
-      coreGrd.addColorStop(0.62, `rgba(${hexToRgb(liveColors[1], hxCache)}, 0.55)`);
-      coreGrd.addColorStop(1,    'rgba(0,0,0,0)');
-      ctx.fillStyle = coreGrd;
-      ctx.shadowColor = liveColors[0]; ctx.shadowBlur = 20 + burst * 30;
-      ctx.globalAlpha = 0.88 + burst * 0.12;
-      ctx.beginPath(); ctx.arc(cx, cy, coreR, 0, Math.PI * 2); ctx.fill();
-      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-      } // end non-nova solar block
+      // ── Crisp shockwave ring outlines ───────────────────────────────────
+      for (let wi = 0; wi < waves.length; wi++) {
+        const wv = waves[wi];
+        const col = liveColors[wv.colorIdx % liveColors.length];
+        ctx.strokeStyle = `rgba(${hexToRgb(col, hxCache)},${wv.strength * 0.5})`;
+        ctx.lineWidth = 1 + wv.strength * 2.5;
+        ctx.beginPath(); ctx.arc(cx, cy, wv.r, 0, Math.PI * 2); ctx.stroke();
+      }
+
+      // ── Geometric core: clean rotating polygon ──────────────────────────
+      const coreR = minDim * 0.05 * (1 + burst * 0.7 + bass * 0.3);
+      const sides = 6, rot = t * 0.4 + burst * 0.5;
+      const hg = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 4);
+      hg.addColorStop(0, `rgba(${hexToRgb(liveColors[0], hxCache)},${0.10 + burst * 0.18})`);
+      hg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = hg;
+      ctx.beginPath(); ctx.arc(cx, cy, coreR * 4, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = `rgba(${hexToRgb(liveColors[0], hxCache)},${0.7 + burst * 0.3})`;
+      ctx.lineWidth = 2 + burst * 3;
+      ctx.beginPath();
+      for (let s = 0; s <= sides; s++) {
+        const a = (s / sides) * Math.PI * 2 + rot;
+        const rr = coreR * (1 + burst * 0.2);
+        if (s === 0) ctx.moveTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+        else ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+      }
+      ctx.stroke();
+      ctx.fillStyle = `rgba(255,255,255,${0.8 + burst * 0.2})`;
+      ctx.beginPath(); ctx.arc(cx, cy, coreR * 0.32, 0, Math.PI * 2); ctx.fill();
+
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1; ctx.shadowBlur = 0;
     }
 
     // ── Post-processing ───────────────────────────────────────────────────
