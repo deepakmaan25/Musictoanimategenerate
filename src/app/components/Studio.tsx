@@ -82,6 +82,8 @@ type Sphere = { x: number; y: number; vx: number; vy: number; phase: number; siz
 type ResonanceNode = { x: number; y: number; hx: number; hy: number; driftA: number; driftR: number;
   driftSpd: number; phase: number; depth: number; hue: number; twinkle: number; };
 type Planet = { angle: number; speed: number; dist: number; size: number; color: number };
+type OrbitBody = { a: number; ecc: number; tilt: number; planeRot: number; angle: number;
+  speed: number; hue: number; band: number; dir: number; trail: { x: number; y: number; depth: number }[] };
 type GridDot = { bx: number; by: number; x: number; y: number; d: number };
 type Shockwave = { r: number; maxR: number; speed: number; width: number; strength: number; colorIdx: number };
 
@@ -152,10 +154,8 @@ const VARIANTS: Partial<Record<EngineId, { id: string; label: string; descriptio
     { id: 'galaxy',    label: 'Galaxy',    description: 'Stars orbit a central core with Keplerian speed' },
   ],
   orbital: [
-    { id: 'rings', label: 'Rings', description: 'Tilting concentric rings (default)' },
+    { id: 'orbit', label: 'Orbit', description: 'Luminous bodies trace tilted orbits, leaving comet trails (default)' },
     { id: 'helix', label: 'Helix', description: 'Stacked rings twist into a DNA double helix' },
-    { id: 'web',   label: 'Web',   description: 'Rings laced with radial spokes — spins on every beat' },
-    { id: 'pulse', label: 'Pulse', description: 'Rings shockwave-burst outward from core on every beat' },
   ],
   tunnel: [
     { id: 'aurora',   label: 'Aurora',   description: 'Layered horizontal ribbon curtains (default)' },
@@ -379,6 +379,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
   const tunnelTRef = useRef(0);
   const cameraTRef = useRef(0);
   const solarTRef  = useRef(0);
+  const orbitBodiesRef = useRef<OrbitBody[]>([]);
   const gridDotsRef   = useRef<GridDot[]>([]);
   const shockwavesRef = useRef<Shockwave[]>([]);
   const gridKeyRef    = useRef<string>('');
@@ -1005,113 +1006,12 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
       const bass = avg(freq, 0, 16), mids = avg(freq, 16, 80), highs = avg(freq, 80, 200);
       cameraTRef.current += (0.004 + bass * 0.01 * sens) * energyMult;
       const orbitOnset = Math.max(0, bass - prevBassRef.current);
-      if (eng === 'orbital') prevBassRef.current = bass;
+      prevBassRef.current = bass;
       if (orbitOnset > 0.05) smoothedBurstRef.current = Math.min(1, smoothedBurstRef.current + orbitOnset * 2.5);
       smoothedBurstRef.current *= 0.84;
       const burst = smoothedBurstRef.current;
 
-      if (vrnt === 'pulse') {
-        // ── Pulse: shockwave rings launch from core on every beat ────────
-        if (!planetsRef.current) planetsRef.current = [];
-        // Spawn ring on beat onset
-        if (orbitOnset > 0.045) {
-          const pCount = Math.floor(1 + orbitOnset * 3);
-          for (let p = 0; p < pCount && planetsRef.current.length < 24; p++) {
-            planetsRef.current.push({
-              r:      Math.min(w,h) * 0.04,
-              speed:  (2.8 + orbitOnset * 5 + Math.random() * 2) * energyMult,
-              alpha:  Math.min(1, 0.55 + orbitOnset * 1.8),
-              color:  liveColors[Math.floor(Math.random() * liveColors.length)],
-              lw:     1.5 + orbitOnset * 8,
-            } as any);
-          }
-        }
-        // Draw background: subtle rotating mesh of 3 standing rings
-        for (let i = 0; i < 3; i++) {
-          const bv  = avg(freq, i * 20, i * 20 + 20);
-          const r   = Math.min(w,h) * (0.14 + i * 0.11) * (1 + bv * sens * 0.22);
-          const rot = cameraTRef.current * (0.18 + i * 0.09) * (i % 2 === 0 ? 1 : -1);
-          ctx.save();
-          ctx.strokeStyle = liveColors[i % liveColors.length];
-          ctx.lineWidth   = 0.8 + bv * 2;
-          ctx.globalAlpha = 0.12 + bv * 0.28;
-          ctx.translate(cx, cy); ctx.rotate(rot); ctx.scale(1, 0.55);
-          ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
-          ctx.restore();
-        }
-        // Shockwave rings expand + fade
-        planetsRef.current = (planetsRef.current as any[]).filter((ring: any) => {
-          ring.r     += ring.speed;
-          ring.alpha *= 0.90;
-          ring.lw    *= 0.94;
-          if (ring.alpha < 0.02 || ring.r > Math.min(w,h) * 0.7) return false;
-          ctx.save();
-          ctx.strokeStyle = ring.color;
-          ctx.lineWidth   = ring.lw;
-          ctx.globalAlpha = ring.alpha * (0.55 + sectionIntensity * 0.45);
-          ctx.shadowColor = ring.color; ctx.shadowBlur = 12 + burst * 18;
-          ctx.beginPath(); ctx.arc(cx, cy, ring.r, 0, Math.PI * 2); ctx.stroke();
-          // Inner fill bloom
-          ctx.globalAlpha = ring.alpha * 0.08;
-          ctx.fillStyle   = ring.color; ctx.shadowBlur = 0;
-          ctx.beginPath(); ctx.arc(cx, cy, ring.r * 0.92, 0, Math.PI * 2); ctx.fill();
-          ctx.restore();
-          return true;
-        });
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-        // Core
-        const cG = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w,h) * 0.07 * (1 + burst * 0.6));
-        cG.addColorStop(0, '#ffffff'); cG.addColorStop(0.3, liveColors[0]); cG.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = cG; ctx.globalAlpha = 0.8 + burst * 0.2;
-        ctx.shadowColor = liveColors[0]; ctx.shadowBlur = 16 + burst * 24;
-        ctx.beginPath(); ctx.arc(cx, cy, Math.min(w,h) * 0.07 * (1 + burst * 0.6), 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-
-      } else if (vrnt === 'web') {
-        // ── Web: concentric rings laced with radial spokes ───────────────
-        const spokeN = perf ? 8 : 14;
-        const ringN  = perf ? 4 : 7;
-        const webRot = cameraTRef.current * 0.22 + burst * 0.4;
-        // Rings
-        for (let r = 0; r < ringN; r++) {
-          const t2     = (r + 1) / ringN;
-          const bandV  = avg(freq, Math.floor(t2 * freq.length * 0.5), Math.floor(t2 * freq.length * 0.5) + 8);
-          const radius = Math.min(w, h) * 0.08 + t2 * Math.min(w, h) * 0.37 * (0.75 + sectionIntensity * 0.25);
-          const liveRadius = radius * (1 + bandV * sens * 0.25);
-          const color  = liveColors[r % liveColors.length];
-          ctx.save();
-          ctx.strokeStyle = color;
-          ctx.lineWidth   = 0.8 + bandV * 3.5 * sens;
-          ctx.globalAlpha = 0.25 + bandV * 0.65;
-          ctx.shadowColor = color; ctx.shadowBlur = 5 + bandV * 18;
-          ctx.beginPath(); ctx.arc(cx, cy, liveRadius, 0, Math.PI * 2); ctx.stroke();
-          ctx.restore();
-        }
-        // Spokes radiating from centre to outer ring
-        const outerR = Math.min(w, h) * 0.45 * (0.75 + sectionIntensity * 0.25);
-        for (let s = 0; s < spokeN; s++) {
-          const angle  = (s / spokeN) * Math.PI * 2 + webRot;
-          const bandV  = (freq[Math.min(Math.floor(s * freq.length / spokeN), freq.length - 1)] / 255) * sens;
-          const color  = liveColors[s % liveColors.length];
-          ctx.save();
-          ctx.strokeStyle = color;
-          ctx.lineWidth   = 0.6 + bandV * 2.2;
-          ctx.globalAlpha = 0.18 + bandV * 0.52;
-          ctx.shadowColor = color; ctx.shadowBlur = 4 + bandV * 12;
-          ctx.beginPath();
-          ctx.moveTo(cx, cy);
-          ctx.lineTo(cx + Math.cos(angle) * outerR, cy + Math.sin(angle) * outerR);
-          ctx.stroke();
-          ctx.restore();
-        }
-        // Centre glow
-        const cG = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w,h) * 0.06 * (1 + burst * 0.8));
-        cG.addColorStop(0, liveColors[0]); cG.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = cG; ctx.globalAlpha = 0.6 + burst * 0.4;
-        ctx.beginPath(); ctx.arc(cx, cy, Math.min(w,h) * 0.06 * (1 + burst * 0.8), 0, Math.PI * 2); ctx.fill();
-        ctx.globalAlpha = 1; ctx.shadowBlur = 0;
-
-      } else if (vrnt === 'helix') {        // ── Helix: stacked rings twist into a DNA double helix ──────────
+      if (vrnt === 'helix') {
         const helixN = perf ? 9 : 20;
         const bandH  = h / helixN;
         ctx.shadowBlur = 0;
@@ -1156,42 +1056,125 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
         ctx.globalAlpha = 1; ctx.shadowBlur = 0;
 
       } else {
-        // ── Rings (default): concentric tilting orbital rings ────────────
-        const tilt = 0.4 + Math.sin(cameraTRef.current * 0.6) * 0.2;
-        const coreR = Math.min(w, h) * 0.07 * (1 + bass * sens * 0.6);
-        const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 3);
-        coreGrad.addColorStop(0, liveColors[0]); coreGrad.addColorStop(0.4, liveColors[1]); coreGrad.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = coreGrad; ctx.beginPath(); ctx.arc(cx, cy, coreR * 3, 0, Math.PI * 2); ctx.fill();
-        const ringCount = perf ? 3 : 8;
-        for (let r = 0; r < ringCount; r++) {
-          const baseR = Math.min(w, h) * (0.12 + r * 0.07) * (1 + bass * sens * 0.15) * (0.7 + sectionIntensity * 0.3);
-          const thickness = (1.5 + mids * 6 * sens + r * 0.4) * energyMult;
-          const rot = cameraTRef.current * (0.3 + r * 0.1) + r;
+        // ── Orbiting bodies (default): luminous bodies on tilted elliptical
+        //    orbits leaving comet trails. Active frequency bands trail longer
+        //    & glow brighter. Smooth, graceful flow; gentle swell on beats. ──
+        const minDim = Math.min(w, h);
+        const NORBIT = perf ? 5 : 7;
+
+        // Lazy-init orbits (rebuild only if count changes)
+        if (!orbitBodiesRef.current || orbitBodiesRef.current.length !== NORBIT) {
+          orbitBodiesRef.current = Array.from({ length: NORBIT }, (_, i) => {
+            const tt = NORBIT > 1 ? i / (NORBIT - 1) : 0;
+            return {
+              a:        0.16 + tt * 0.30,
+              ecc:      0.15 + Math.random() * 0.25,
+              tilt:     0.30 + tt * 0.45,
+              planeRot: i * 0.6 + Math.random() * 0.5,
+              angle:    Math.random() * Math.PI * 2,
+              speed:    0.9 - tt * 0.5,
+              hue:      tt,
+              band:     tt,
+              dir:      i % 2 === 0 ? 1 : -1,
+              trail:    [] as { x: number; y: number; depth: number }[],
+            };
+          });
+        }
+        const orbits = orbitBodiesRef.current;
+
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.shadowBlur = 0;
+
+        // Faint orbit paths (behind bodies)
+        for (let oi = 0; oi < orbits.length; oi++) {
+          const o = orbits[oi];
+          const col = liveColors[Math.floor(o.hue * liveColors.length) % liveColors.length];
+          ctx.strokeStyle = `rgba(${hexToRgb(col, hxCache)},0.06)`;
+          ctx.lineWidth = 1;
           ctx.save();
-          ctx.translate(cx, cy); ctx.rotate(rot); ctx.scale(1, Math.max(0.15, tilt - r * 0.03));
-          ctx.strokeStyle = liveColors[r % liveColors.length];
-          ctx.globalAlpha = 0.55 + mids * 0.5;
-          ctx.lineWidth = thickness;
-          ctx.beginPath(); ctx.arc(0, 0, baseR, 0, Math.PI * 2); ctx.stroke();
+          ctx.translate(cx, cy); ctx.rotate(o.planeRot); ctx.scale(1, o.tilt);
+          const A = o.a * minDim, B = A * (1 - o.ecc);
+          ctx.beginPath(); ctx.ellipse(0, 0, A, B, 0, 0, Math.PI * 2); ctx.stroke();
           ctx.restore();
-          if (highs > 0.55 && Math.random() < 0.3) {
-            sparksRef.current.push({ angle: Math.random() * Math.PI * 2, r: baseR, speed: 0.04 + highs * 0.05, life: 1, ring: r });
+        }
+
+        // Central core halo (behind bodies)
+        const coreR = minDim * 0.05 * (1 + burst * 0.5 + bass * sens * 0.3);
+        const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 5);
+        cg.addColorStop(0,   `rgba(${hexToRgb(liveColors[0], hxCache)},${0.18 + burst * 0.18})`);
+        cg.addColorStop(0.4, `rgba(${hexToRgb(liveColors[1], hxCache)},0.06)`);
+        cg.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.fillStyle = cg;
+        ctx.beginPath(); ctx.arc(cx, cy, coreR * 5, 0, Math.PI * 2); ctx.fill();
+
+        // Bodies + comet trails
+        for (let oi = 0; oi < orbits.length; oi++) {
+          const o = orbits[oi];
+          // band value for this body
+          const bLo = Math.floor(o.band * freq.length * 0.45);
+          const bv  = Math.min(1, avg(freq, bLo, bLo + 16) * sens);
+
+          // advance (inner faster; gentle beat swell)
+          o.angle += o.dir * 0.016 * (0.5 + o.speed * 1.1) * (1 + bass * 0.5) * energyMult;
+
+          // position on tilted, rotated ellipse
+          const A = o.a * minDim, B = A * (1 - o.ecc);
+          const ex = Math.cos(o.angle) * A;
+          const ey = Math.sin(o.angle) * B * o.tilt;
+          const cr = Math.cos(o.planeRot), sr = Math.sin(o.planeRot);
+          const px = cx + ex * cr - ey * sr;
+          const py = cy + ex * sr + ey * cr;
+          const depth = Math.sin(o.angle);            // +behind / -front
+          const depthF = 0.6 - depth * 0.4;           // front brighter/bigger
+
+          // record trail (length driven by band activity)
+          o.trail.push({ x: px, y: py, depth });
+          const maxTrail = Math.floor(14 + bv * 30 + burst * 10);
+          while (o.trail.length > maxTrail) o.trail.shift();
+
+          const col = liveColors[Math.floor(o.hue * liveColors.length) % liveColors.length];
+          const rgbCol = hexToRgb(col, hxCache);
+
+          // trail
+          for (let i = 1; i < o.trail.length; i++) {
+            const tt = i / o.trail.length;
+            const a = tt * tt * (0.10 + bv * 0.5 + burst * 0.1);
+            if (a < 0.005) continue;
+            ctx.strokeStyle = `rgba(${rgbCol},${a})`;
+            ctx.lineWidth = 0.5 + tt * (1.5 + bv * 3);
+            ctx.beginPath();
+            ctx.moveTo(o.trail[i - 1].x, o.trail[i - 1].y);
+            ctx.lineTo(o.trail[i].x, o.trail[i].y);
+            ctx.stroke();
           }
+
+          // body halo + core
+          const size = (2.4 + bv * 5) * depthF * (1 + burst * 0.3);
+          if (!perf) {
+            const g = ctx.createRadialGradient(px, py, 0, px, py, size * 3);
+            g.addColorStop(0, `rgba(${rgbCol},${(0.3 + bv * 0.5) * depthF})`);
+            g.addColorStop(1, `rgba(${rgbCol},0)`);
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(px, py, size * 3, 0, Math.PI * 2); ctx.fill();
+          }
+          ctx.fillStyle = `rgba(${rgbCol},${Math.min(1, 0.7 + bv * 0.5) * depthF})`;
+          ctx.beginPath(); ctx.arc(px, py, size, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = `rgba(255,255,255,${0.6 * depthF})`;
+          ctx.beginPath(); ctx.arc(px, py, size * 0.4, 0, Math.PI * 2); ctx.fill();
         }
-        ctx.globalAlpha = 1;
-        for (const s of sparksRef.current) {
-          s.angle += s.speed; s.life *= 0.96;
-          const baseR = Math.min(w, h) * (0.12 + s.ring * 0.07);
-          const x = cx + Math.cos(s.angle) * baseR;
-          const y = cy + Math.sin(s.angle) * baseR * Math.max(0.15, tilt - s.ring * 0.03);
-          ctx.fillStyle = liveColors[2]; ctx.globalAlpha = s.life;
-          ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
-        }
-        ctx.globalAlpha = 1;
-        sparksRef.current = sparksRef.current.filter((s) => s.life > 0.08);
+
+        // Bright core (front)
+        const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
+        coreGrad.addColorStop(0,   '#ffffff');
+        coreGrad.addColorStop(0.3, `rgba(${hexToRgb(liveColors[0], hxCache)},1)`);
+        coreGrad.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.fillStyle = coreGrad;
+        ctx.beginPath(); ctx.arc(cx, cy, coreR, 0, Math.PI * 2); ctx.fill();
+
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1; ctx.shadowBlur = 0;
       }
 
-    // ── Depth Field Particles ────────────────────────────────────────────
     } else if (eng === 'depth') {
       const bass = avg(freq, 0, 16), mids = avg(freq, 16, 80), highs = avg(freq, 80, 200);
       const bassOnset = Math.max(0, bass - prevBassRef.current);
