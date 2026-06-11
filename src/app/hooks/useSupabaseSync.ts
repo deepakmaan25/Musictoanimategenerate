@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { upsertProject, upsertTrack, upsertExportRecord, patchExportRecord } from '../lib/db';
 import { uploadAudioFile, uploadExportBlob } from '../lib/storage';
+import { supabase } from '../lib/supabase';
 
 export type SyncableConfig = {
   engineId: string;
@@ -78,7 +79,6 @@ const uploadAudio = useCallback(
   ): Promise<string | null> => {
     // Get the user live at call time — avoids race where hook captured
     // userId=undefined before the auth session was restored on page load
-    const { supabase } = await import('../lib/supabase');
     const { data: { user: liveUser } } = await supabase.auth.getUser();
     const resolvedUserId = liveUser?.id ?? userId;
 
