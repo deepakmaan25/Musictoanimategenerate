@@ -78,6 +78,9 @@ type ExportJob = {
 type Star   = { x: number; y: number; z: number; hue: number };
 type Spark  = { angle: number; r: number; speed: number; life: number; ring: number };
 type Sphere = { x: number; y: number; vx: number; vy: number; phase: number; size: number; hue: number };
+// Constellation / curtain node (reuses spheresRef storage; fields aliased per engine)
+type ResonanceNode = { x: number; y: number; hx: number; hy: number; driftA: number; driftR: number;
+  driftSpd: number; phase: number; depth: number; hue: number; twinkle: number; };
 type Planet = { angle: number; speed: number; dist: number; size: number; color: number };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -1594,481 +1597,242 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
 
     // ── Neon Tunnel (upgraded: glow, bass zoom, mids brightness) ─────────
     } else if (eng === 'tunnel') {
-      // ── Liquid Aurora — flowing colour curtains ───────────────────────
-      ctx.fillStyle = `rgba(2,2,10,${0.18 + (1-sectionIntensity)*0.08})`;
-      ctx.fillRect(0, 0, w, h);
-      const bass = avg(freq, 0, 16), mids = avg(freq, 16, 80), highs = avg(freq, 80, 200);
-      const tunnelOnset = Math.max(0, bass - prevBassRef.current);
-      if (eng === 'tunnel') prevBassRef.current = bass;
-      if (tunnelOnset > 0.05) smoothedBurstRef.current = Math.min(1, smoothedBurstRef.current + tunnelOnset * 2.5);
-      smoothedBurstRef.current *= 0.84;
+      // ── Liquid Aurora — flowing light curtains ───────────────────────────
+      // Vertical curtains of light sway, fold, and drape; brightness ripples
+      // downward. Glow via layered additive fills (NO shadowBlur) — smooth and
+      // cheap. Calm flow between beats; curtains flare wide & bright on hits.
+      const bass  = avg(freq, 0, 16);
+      const mids  = avg(freq, 16, 80);
+      const highs = avg(freq, 80, 200);
+      const energy = Math.min(1, bass * 0.5 + mids * 0.32 + highs * 0.18);
+
+      const aurOnset = Math.max(0, bass - prevBassRef.current);
+      prevBassRef.current = bass;
+      if (aurOnset > 0.05) smoothedBurstRef.current = Math.min(1, smoothedBurstRef.current + (0.8 + energy * 0.4));
+      smoothedBurstRef.current *= 0.86;
       const burst = smoothedBurstRef.current;
-      tunnelTRef.current += (0.004 + mids * 0.008 * sens) * energyMult;
+
+      tunnelTRef.current += (0.18 + mids * 0.4) * 0.016 * energyMult;
       const t = tunnelTRef.current;
-      const cx2 = w / 2;
 
-      // Tunnel variant: circle/square still use tunnel engine but aurora ignores vrnt
-      const numRibbons = perf ? 5 : 11;
+      const minDim = Math.min(w, h);
+      const NCURTAIN = perf ? 5 : 7;
+      const SEG = perf ? 14 : 22;
 
-      if (vrnt === 'vertical') {
-        // ── Vertical: columns rising from the bottom ─────────────────────
-        const steps = perf ? 36 : 60;
-        const pts2  = steps + 1;
-        if (ribbonPathCache.current.length !== numRibbons ||
-            (ribbonPathCache.current[0]?.length ?? 0) !== pts2 * 2) {
-          ribbonPathCache.current = Array.from({ length: numRibbons }, () => new Float32Array(pts2 * 2));
-          ribbonGradCache.current.clear();
-        }
-        for (let ri = 0; ri < numRibbons; ri++) {
-          const bandLo  = Math.floor((ri / numRibbons) * freq.length * 0.5);
-          const bandHi  = Math.floor(((ri + 1) / numRibbons) * freq.length * 0.5);
-          const bandVal = avg(freq, bandLo, bandHi) * sens * energyMult;
-          const color   = liveColors[ri % liveColors.length];
-          const colX    = w * (0.05 + ri / numRibbons * 0.9);
-          const amp     = Math.min(w / 9, (20 + bandVal * w * 0.06) * (0.4 + sectionIntensity * 0.6));
-          const freq2   = 2.5 + ri * 0.7;
-          const phase   = t * (0.8 + ri * 0.15);
-          const piF2    = Math.PI * freq2;
-          const piF2h   = Math.PI * freq2 * 0.5;
-          const buf     = ribbonPathCache.current[ri];
-
-          for (let s = 0; s <= steps; s++) {
-            const frac = s / steps;
-            const sinA = Math.sin(frac * piF2  + phase);
-            const sinB = Math.sin(frac * piF2h + phase * 1.3);
-            buf[s * 2]     = colX + sinA * amp + sinB * amp * 0.4;
-            buf[s * 2 + 1] = frac * h;
-          }
-
-          const gradKey = `v|${color}|${h}`;
-          let grad = ribbonGradCache.current.get(gradKey);
-          if (!grad) {
-            grad = ctx.createLinearGradient(0, 0, 0, h);
-            grad.addColorStop(0,    `rgba(${hexToRgb(color, hxCache)}, 0)`);
-            grad.addColorStop(0.15, color);
-            grad.addColorStop(0.85, color);
-            grad.addColorStop(1,    `rgba(${hexToRgb(color, hxCache)}, 0)`);
-            ribbonGradCache.current.set(gradKey, grad);
-          }
-
-          const alpha = (0.12 + bandVal * 0.55) * (0.5 + sectionIntensity * 0.5);
-          ctx.globalAlpha = alpha;
-          ctx.strokeStyle = grad;
-          ctx.lineWidth   = 2 + bandVal * 14 * (0.5 + sectionIntensity * 0.5);
-          ctx.lineCap     = 'round';
-          ctx.shadowColor = color;
-          ctx.shadowBlur  = perf ? 0 : Math.min(14, bandVal * 14);
-          ctx.beginPath();
-          ctx.moveTo(buf[0], buf[1]);
-          for (let s = 1; s <= steps; s++) ctx.lineTo(buf[s*2], buf[s*2+1]);
-          ctx.stroke();
-
-          if (bandVal > 0.40 && !perf) {
-            ctx.shadowBlur  = 0;
-            ctx.globalAlpha = alpha * 0.18;
-            ctx.fillStyle   = color;
-            ctx.beginPath();
-            ctx.moveTo(colX, 0);
-            for (let s = 0; s <= steps; s++) ctx.lineTo(buf[s*2], buf[s*2+1]);
-            ctx.lineTo(colX + amp, h); ctx.lineTo(colX + amp, 0);
-            ctx.closePath(); ctx.fill();
-          }
-        }
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-      } else if (vrnt === 'spiral') {
-        // ── Spiral: vanishing-point rings collapsing inward ──────────────
-        const ringCount = perf ? 10 : 24;
-        tunnelTRef.current += (0.012 + bass * 0.022 * sens) * energyMult;
-        const speed = tunnelTRef.current;
-        for (let i = 0; i < ringCount; i++) {
-          // Phase offset makes each ring appear at a different point in the tunnel
-          const phase    = (i / ringCount + (speed * 0.18 % 1));
-          const normP    = phase % 1; // 0 = far (small), 1 = near (large, fading out)
-          const radius   = Math.min(w, h) * 0.04 + normP * Math.min(w, h) * 0.48;
-          const bandIdx  = Math.min(Math.floor(normP * freq.length * 0.6), freq.length - 1);
-          const bandV    = (freq[bandIdx] / 255) * sens;
-          const color    = liveColors[i % liveColors.length];
-          const alpha    = (1 - normP) * (0.55 + bandV * 0.45) * (0.5 + sectionIntensity * 0.5);
-          // Rotation increases toward camera (larger = faster apparent rotation)
-          const rot      = speed * 0.55 * (0.3 + normP * 1.4) + i * (Math.PI * 2 / ringCount);
-          // Slight ellipse for perspective feel
-          const ry       = radius * (0.62 + normP * 0.38);
-
-          ctx.save();
-          ctx.strokeStyle = color;
-          ctx.lineWidth   = (0.8 + normP * 5.5 + bandV * 4) * (0.5 + sectionIntensity * 0.5);
-          ctx.globalAlpha = alpha;
-          ctx.shadowColor = color;
-          ctx.shadowBlur  = (6 + bandV * 24) * (0.5 + sectionIntensity * 0.5);
-          ctx.translate(cx2, h / 2);
-          ctx.rotate(rot);
-          ctx.beginPath(); ctx.ellipse(0, 0, radius, ry, 0, 0, Math.PI * 2); ctx.stroke();
-          ctx.restore();
-        }
-        // Vanishing point glow
-        const vpGrad = ctx.createRadialGradient(cx2, h/2, 0, cx2, h/2, Math.min(w,h)*0.12*(1+burst*0.6));
-        vpGrad.addColorStop(0, liveColors[0]); vpGrad.addColorStop(1,'rgba(0,0,0,0)');
-        ctx.fillStyle = vpGrad; ctx.globalAlpha = 0.5 + burst * 0.5;
-        ctx.beginPath(); ctx.arc(cx2, h/2, Math.min(w,h)*0.12*(1+burst*0.6), 0, Math.PI*2); ctx.fill();
-        ctx.globalAlpha = 1; ctx.shadowBlur = 0;
-
-      } else if (vrnt === 'wave') {
-        // ── Wave: concentric sine rings ripple outward from centre ────────
-        const waveN   = perf ? 10 : 24;
-        tunnelTRef.current += (0.014 + mids * 0.018 * sens) * energyMult;
-        const wt = tunnelTRef.current;
-        const cxw = w / 2, cyw = h / 2;
-
-        for (let i = 0; i < waveN; i++) {
-          // Each ring: radius grows with time, creating a ripple-outward feel
-          const phase   = (i / waveN + wt * 0.14) % 1;
-          const radius  = phase * Math.min(w, h) * 0.62;
-          const bandIdx = Math.min(Math.floor(phase * freq.length * 0.55), freq.length - 1);
-          const bandV   = (freq[bandIdx] / 255) * sens;
-          const color   = liveColors[i % liveColors.length];
-          const alpha   = (1 - phase) * (0.4 + bandV * 0.6) * (0.4 + sectionIntensity * 0.6);
-
-          // Distorted ellipse — sine-warp around perimeter gives "wave" feel
-          const steps = perf ? 48 : 96;
-          ctx.beginPath();
-          for (let s = 0; s <= steps; s++) {
-            const angle  = (s / steps) * Math.PI * 2;
-            const warp   = 1 + Math.sin(angle * 3 + wt * 2.8) * bandV * 0.22
-                             + Math.sin(angle * 5 - wt * 1.6) * bandV * 0.12;
-            const rx = cxw + Math.cos(angle) * radius * warp;
-            const ry = cyw + Math.sin(angle) * radius * warp * (0.62 + phase * 0.38);
-            s === 0 ? ctx.moveTo(rx, ry) : ctx.lineTo(rx, ry);
-          }
-          ctx.closePath();
-          ctx.strokeStyle = color;
-          ctx.lineWidth   = (0.8 + bandV * 4.5 + (1 - phase) * 2) * (0.5 + sectionIntensity * 0.5);
-          ctx.globalAlpha = alpha;
-          ctx.shadowColor = color; ctx.shadowBlur = 6 + bandV * 22;
-          ctx.stroke();
-          // Semi-transparent fill bloom on inner rings
-          if (phase < 0.35) {
-            ctx.fillStyle   = color;
-            ctx.globalAlpha = alpha * 0.09;
-            ctx.shadowBlur  = 0;
-            ctx.fill();
-          }
-        }
-        ctx.globalAlpha = 1; ctx.shadowBlur = 0;
-        // Centre glow
-        const wvGrad = ctx.createRadialGradient(cxw, cyw, 0, cxw, cyw, Math.min(w,h) * 0.10 * (1 + burst * 0.5));
-        wvGrad.addColorStop(0, liveColors[0]); wvGrad.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = wvGrad; ctx.globalAlpha = 0.6 + burst * 0.4;
-        ctx.beginPath(); ctx.arc(cxw, cyw, Math.min(w,h) * 0.10 * (1 + burst * 0.5), 0, Math.PI * 2); ctx.fill();
-        ctx.globalAlpha = 1;
-
-      } else {
-        // ── Aurora (default): horizontal ribbons ─────────────────────────
-        // OPTIMISED: paths stored in Float32Array (pre-computed once per frame);
-        // gradients cached per color; fill reuses computed points; shadowBlur capped.
-        const steps = perf ? 36 : 72;  // 72 gives smoother curves at full resolution
-        const pts2  = steps + 1;
-
-        // Resize path cache if ribbon count or step count changed
-        if (ribbonPathCache.current.length !== numRibbons ||
-            (ribbonPathCache.current[0]?.length ?? 0) !== pts2 * 2) {
-          ribbonPathCache.current = Array.from({ length: numRibbons },
-            () => new Float32Array(pts2 * 2));
-          ribbonGradCache.current.clear();
-        }
-
-        for (let ri = 0; ri < numRibbons; ri++) {
-          const bandLo  = Math.floor((ri / numRibbons) * freq.length * 0.5);
-          const bandHi  = Math.floor(((ri + 1) / numRibbons) * freq.length * 0.5);
-          const bandVal = avg(freq, bandLo, bandHi) * sens * energyMult;
-          const color   = liveColors[ri % liveColors.length];
-          const ribbonY = h * (0.1 + ri / numRibbons * 0.8);
-          const amp     = Math.min(h / 9, (20 + bandVal * h * 0.06) * (0.4 + sectionIntensity * 0.6));
-          const freq2   = 2.5 + ri * 0.7;
-          const phase   = t * (0.8 + ri * 0.15);
-          const buf     = ribbonPathCache.current[ri];
-          // Pre-computed trig multipliers (avoid repeated multiply inside loop)
-          const piF2    = Math.PI * freq2;
-          const piF2h   = Math.PI * freq2 * 0.5;
-
-          // ── Pre-compute all path points into Float32Array ──────────────
-          for (let s = 0; s <= steps; s++) {
-            const frac = s / steps;
-            buf[s * 2]     = frac * w;
-            buf[s * 2 + 1] = ribbonY
-              + Math.sin(frac * piF2  + phase) * amp
-              + Math.sin(frac * piF2h + phase * 1.3) * amp * 0.4;
-          }
-
-          // ── Gradient: cached per color+width key (rarely changes) ──────
-          const gradKey = `${color}|${w}`;
-          let grad = ribbonGradCache.current.get(gradKey);
-          if (!grad) {
-            grad = ctx.createLinearGradient(0, 0, w, 0);
-            grad.addColorStop(0,    `rgba(${hexToRgb(color, hxCache)}, 0)`);
-            grad.addColorStop(0.15, color);
-            grad.addColorStop(0.85, color);
-            grad.addColorStop(1,    `rgba(${hexToRgb(color, hxCache)}, 0)`);
-            ribbonGradCache.current.set(gradKey, grad);
-          }
-
-          // ── Stroke ─────────────────────────────────────────────────────
-          const alpha = (0.12 + bandVal * 0.55) * (0.5 + sectionIntensity * 0.5);
-          ctx.globalAlpha = alpha;
-          ctx.strokeStyle = grad;
-          ctx.lineWidth   = 2 + bandVal * 12 * (0.5 + sectionIntensity * 0.5);
-          ctx.lineCap     = 'round';
-          ctx.shadowColor = color;
-          // Cap at 14: still visibly glowy, but GPU blur kernel is 4× smaller than 58
-          ctx.shadowBlur  = perf ? 0 : Math.min(14, bandVal * 14);
-          ctx.beginPath();
-          ctx.moveTo(buf[0], buf[1]);
-          for (let s = 1; s <= steps; s++) ctx.lineTo(buf[s*2], buf[s*2+1]);
-          ctx.stroke();
-
-          // ── Fill bloom: reuses buf — zero extra sin() calls ────────────
-          if (bandVal > 0.40 && !perf) {
-            ctx.shadowBlur  = 0;
-            ctx.globalAlpha = alpha * 0.18;
-            ctx.fillStyle   = color;
-            ctx.beginPath();
-            ctx.moveTo(0, ribbonY);
-            for (let s = 0; s <= steps; s++) ctx.lineTo(buf[s*2], buf[s*2+1]);
-            ctx.lineTo(w, ribbonY + amp); ctx.lineTo(0, ribbonY + amp);
-            ctx.closePath(); ctx.fill();
-          }
-        }
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+      // Lazy-init curtains (stored in spheresRef — unused by other engines here)
+      if (!spheresRef.current || spheresRef.current.length !== NCURTAIN) {
+        spheresRef.current = Array.from({ length: NCURTAIN }, (_, i) => ({
+          x: 0, y: 0, vx: 0, vy: 0,
+          hx: (i + 0.5) / NCURTAIN,                     // baseX
+          hy: 0.06 + Math.random() * 0.05,              // width fraction
+          driftA:   Math.random() * Math.PI * 2,        // swayPhase
+          driftR:   0,                                  // (unused)
+          driftSpd: 0.25 + Math.random() * 0.3,         // swaySpd
+          phase:    Math.random() * Math.PI * 2,        // foldPhase
+          depth:    0,                                  // (unused)
+          hue:      i / NCURTAIN,
+          twinkle:  0,
+          size: 0,
+        })) as unknown as Sphere[];
       }
-    } else if (eng === 'neon_spheres') {
-      // ── Resonance Field — frequency-reactive 3D node lattice ─────────────
-      ctx.fillStyle = `rgba(3,3,14,${0.30 + (1 - sectionIntensity) * 0.10})`;
-      ctx.fillRect(0, 0, w, h);
+      const curtains = spheresRef.current as unknown as ResonanceNode[];
 
+      // Background + trail fade + faint top-sky wash
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = `rgba(2,2,10,${0.26 + (1 - sectionIntensity) * 0.06})`;
+      ctx.fillRect(0, 0, w, h);
+      const sky = ctx.createLinearGradient(0, 0, 0, h);
+      sky.addColorStop(0,   `rgba(${hexToRgb(liveColors[0], hxCache)},${0.03 + energy * 0.03})`);
+      sky.addColorStop(0.5, 'rgba(0,0,0,0)');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.shadowBlur = 0;
+
+      for (let ci = 0; ci < NCURTAIN; ci++) {
+        const c = curtains[ci];
+        c.driftA += c.driftSpd * 0.016 * (0.6 + mids * 0.7);
+        c.phase  += 0.016 * (0.4 + bass * 0.8);
+
+        // frequency band driving this curtain
+        const bandLo = Math.floor((ci / NCURTAIN) * freq.length * 0.5);
+        const bandHi = Math.floor(((ci + 1) / NCURTAIN) * freq.length * 0.5);
+        const drive  = Math.min(1, avg(freq, bandLo, bandHi) * sens * energyMult);
+        const col    = liveColors[Math.floor(c.hue * liveColors.length) % liveColors.length];
+        const rgbCol = hexToRgb(col, hxCache);
+
+        const sway  = Math.sin(c.driftA) * 0.04 * (1 + bass * 0.8) + Math.sin(t * 0.5) * 0.02;
+        const cxN   = c.hx + sway;
+        const widthPx = c.hy * w * (0.7 + drive * 0.7 + burst * 0.5);   // flare on beats
+
+        let prevLX = 0, prevRX = 0, prevY = 0;
+        for (let s = 0; s <= SEG; s++) {
+          const f = s / SEG;
+          const fold = Math.sin(f * 3.0 + c.phase) * 0.03 * (0.5 + drive)
+                     + Math.sin(f * 6.0 - c.phase * 1.4) * 0.015 * drive;
+          const xPx = (cxN + fold) * w;
+          const wHere = widthPx * (0.25 + 0.75 * Math.pow(f, 0.6));
+          const lx = xPx - wHere * 0.5, rx = xPx + wHere * 0.5;
+          const ripple = 0.5 + 0.5 * Math.sin(f * 5.0 - t * 2.2 + c.driftA);
+          const vertFade = Math.sin(f * Math.PI);
+          const a = (0.05 + drive * 0.22 + burst * 0.14) * ripple * vertFade;
+          const yPx = f * h;
+          if (s > 0 && a > 0.004) {
+            const g = ctx.createLinearGradient(lx, 0, rx, 0);
+            g.addColorStop(0,   `rgba(${rgbCol},0)`);
+            g.addColorStop(0.5, `rgba(${rgbCol},${a})`);
+            g.addColorStop(1,   `rgba(${rgbCol},0)`);
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.moveTo(prevLX, prevY); ctx.lineTo(prevRX, prevY);
+            ctx.lineTo(rx, yPx); ctx.lineTo(lx, yPx);
+            ctx.closePath(); ctx.fill();
+          }
+          prevLX = lx; prevRX = rx; prevY = yPx;
+        }
+
+        // crisp core filament down the curtain
+        ctx.strokeStyle = `rgba(${rgbCol},${0.10 + drive * 0.25})`;
+        ctx.lineWidth = 1.2 + drive * 2;
+        ctx.beginPath();
+        for (let s = 0; s <= SEG; s++) {
+          const f = s / SEG;
+          const fold = Math.sin(f * 3.0 + c.phase) * 0.03 * (0.5 + drive)
+                     + Math.sin(f * 6.0 - c.phase * 1.4) * 0.015 * drive;
+          const xPx = (cxN + fold) * w, yPx = f * h;
+          if (s === 0) ctx.moveTo(xPx, yPx); else ctx.lineTo(xPx, yPx);
+        }
+        ctx.stroke();
+      }
+
+      // beat flare across the top
+      if (burst > 0.05) {
+        const g = ctx.createLinearGradient(0, 0, 0, h * 0.6);
+        g.addColorStop(0, `rgba(${hexToRgb(liveColors[0], hxCache)},${burst * 0.18})`);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, w, h * 0.6);
+      }
+
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+
+    } else if (eng === 'neon_spheres') {
+      // ── Resonance Field — drifting particle constellation ────────────────
+      // Particles drift on slow individual orbits, bob on a shared low-freq
+      // current, and connect with soft additive-glow proximity lines. Calm,
+      // hypnotic base motion; beats punch through with a clear visible kick.
       const bass  = avg(freq, 0, 14);
       const mids  = avg(freq, 14, 70);
       const highs = avg(freq, 70, 200);
-      const energy = bass * 0.50 + mids * 0.32 + highs * 0.18;
+      const energy = Math.min(1, bass * 0.5 + mids * 0.32 + highs * 0.18);
 
       const onset = Math.max(0, bass - prevBassRef.current);
-      if (eng === 'neon_spheres') prevBassRef.current = bass;
-      if (onset > 0.04) smoothedBurstRef.current = Math.min(1, smoothedBurstRef.current + onset * 3.0);
-      smoothedBurstRef.current *= 0.80;
+      prevBassRef.current = bass;
+      if (onset > 0.04) smoothedBurstRef.current = Math.min(1, smoothedBurstRef.current + (0.85 + energy * 0.45));
+      smoothedBurstRef.current *= 0.86;             // punchier envelope
       const burst = smoothedBurstRef.current;
 
-      cameraTRef.current += (0.004 + energy * 0.010 * sens) * energyMult;
+      cameraTRef.current += (0.18 + mids * 0.4) * 0.016 * energyMult;
       const t = cameraTRef.current;
 
       const cx = w / 2, cy = h / 2;
       const minDim = Math.min(w, h);
 
-      // ── Grid topology ─────────────────────────────────────────────────
-      const COLS = perf ? 8 : 12;
-      const ROWS = perf ? 8 : 12;
-      const N = COLS * ROWS;
+      const COUNT = perf ? 56 : 90;
+      if (!spheresRef.current || spheresRef.current.length !== COUNT) {
+        spheresRef.current = Array.from({ length: COUNT }, () => ({
+          x: 0, y: 0, vx: 0, vy: 0,
+          hx: Math.random() * 2 - 1,
+          hy: Math.random() * 2 - 1,
+          driftA:   Math.random() * Math.PI * 2,
+          driftR:   0.04 + Math.random() * 0.10,
+          driftSpd: 0.15 + Math.random() * 0.35,
+          phase:    Math.random() * Math.PI * 2,
+          depth:    0.4 + Math.random() * 0.6,
+          hue:      Math.random(),
+          twinkle:  Math.random() * Math.PI * 2,
+          size: 0,
+        })) as unknown as Sphere[];
+      }
+      const nodes = spheresRef.current as unknown as ResonanceNode[];
 
-      // Lazy-init node positions in normalised space [-1,1]
-      if (!spheresRef.current || spheresRef.current.length !== N) {
-        spheresRef.current = Array.from({ length: N }, (_, i) => {
-          const col = i % COLS;
-          const row = Math.floor(i / COLS);
-          const nx  = (col / (COLS - 1)) * 2 - 1;
-          const ny  = (row / (ROWS - 1)) * 2 - 1;
-          return {
-            x: nx,          // base X in [-1,1]
-            y: ny,          // base Y in [-1,1]
-            z: 0,           // current Z displacement (driven by freq)
-            vx: 0, vy: 0,   // used for shatter variant velocity
-            phase: (col * 0.47 + row * 0.33),   // phase offset for ripple
-            size: 0,        // unused but keeps type compat
-            hue: (col + row) / (COLS + ROWS),   // colour assignment
-          };
-        });
-        planetsRef.current = [];  // shatter debris
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = `rgba(5,5,12,${0.20 + (1 - sectionIntensity) * 0.06})`;
+      ctx.fillRect(0, 0, w, h);
+
+      const fieldR = minDim * (0.42 + bass * 0.10 * sens + burst * 0.14);  // beats push field out
+      const breath = 1 - burst * 0.18;                                     // stronger beat pull
+
+      for (let i = 0; i < COUNT; i++) {
+        const n = nodes[i];
+        n.driftA += n.driftSpd * 0.016 * (0.6 + mids * 0.8);
+        const dx  = Math.cos(n.driftA) * n.driftR;
+        const dy  = Math.sin(n.driftA * 0.8) * n.driftR;
+        const bob = Math.sin(t * 0.7 + n.phase) * 0.05 * (0.5 + energy * 0.5);
+        const px  = (n.hx + dx) * breath;
+        const py  = (n.hy + dy + bob) * breath;
+        n.x = cx + px * fieldR;
+        n.y = cy + py * fieldR;
+        n.twinkle += 0.016 * (1.5 + highs * 4);
       }
 
-      // ── Camera: slow tilt + yaw rotation ─────────────────────────────
-      const yaw   =  Math.sin(t * 0.18) * 0.42 + burst * 0.06;
-      const pitch =  Math.cos(t * 0.14) * 0.28 + 0.30;
-      // Rotation matrix components (YXZ order)
-      const cosY = Math.cos(yaw),   sinY = Math.sin(yaw);
-      const cosP = Math.cos(pitch), sinP = Math.sin(pitch);
-
-      // ── Update Z displacements ────────────────────────────────────────
-      const bandW = Math.floor(freq.length * 0.6 / N);
-      const shatterActive = vrnt === 'shatter' && burst > 0.55;
-
-      for (let i = 0; i < N; i++) {
-        const nd = spheresRef.current[i];
-        const bandIdx = Math.min(i * bandW, freq.length - 1);
-        const fv = (freq[bandIdx] / 255) * sens;
-
-        if (vrnt === 'ripple') {
-          // Ring ripple: Z = sine wave propagating outward from center
-          const dist = Math.hypot(nd.x, nd.y);
-          const wave = Math.sin(dist * 6.5 - t * 4.5 + burst * 2.0) * (0.5 + fv * 0.5);
-          nd.z = wave * (0.25 + bass * 0.55 * sectionIntensity) * energyMult;
-        } else if (vrnt === 'sphere') {
-          // Spherical morph: use azimuth/elevation to map onto sphere surface
-          const col = i % COLS, row = Math.floor(i / COLS);
-          const phi   = (row / (ROWS - 1)) * Math.PI;
-          const theta = (col / (COLS - 1)) * Math.PI * 2;
-          const sphereZ = Math.cos(phi) * 0.5;
-          const target  = sphereZ * (0.8 + fv * 0.4) * (0.6 + sectionIntensity * 0.4);
-          nd.z += (target - nd.z) * 0.08;
-        } else if (vrnt === 'shatter') {
-          if (shatterActive) {
-            // On drop: nodes explode outward
-            const ang = Math.atan2(nd.y, nd.x) + (Math.random() - 0.5) * 1.2;
-            nd.vx = Math.cos(ang) * (0.015 + burst * 0.025);
-            nd.vy = Math.sin(ang) * (0.015 + burst * 0.025);
-          }
-          nd.x += nd.vx; nd.y += nd.vy;
-          nd.vx *= 0.94; nd.vy *= 0.94;
-          // Restore home position (spring)
-          const col = i % COLS, row = Math.floor(i / COLS);
-          const hx = (col / (COLS - 1)) * 2 - 1;
-          const hy = (row / (ROWS - 1)) * 2 - 1;
-          nd.x += (hx - nd.x) * 0.035;
-          nd.y += (hy - nd.y) * 0.035;
-          nd.z = fv * (0.35 + sectionIntensity * 0.30) * energyMult;
-        } else {
-          // web: direct frequency elevation
-          const target = fv * (0.40 + sectionIntensity * 0.35) * energyMult;
-          nd.z += (target - nd.z) * 0.12;
-        }
-      }
-
-      // ── Project nodes to screen ───────────────────────────────────────
-      const focal  = minDim * 0.68;
-      const scale  = minDim * 0.46;
-      const projX: number[] = new Array(N);
-      const projY: number[] = new Array(N);
-      const projD: number[] = new Array(N);  // depth for sorting
-      const projZ: number[] = new Array(N);  // Z for glow
-
-      for (let i = 0; i < N; i++) {
-        const nd = spheresRef.current[i];
-        let x3 = nd.x * scale / minDim;
-        let y3 = nd.y * scale / minDim;
-        let z3 = nd.z;
-
-        // Yaw rotation (Y axis)
-        const rx = x3 * cosY - z3 * sinY;
-        const rz = x3 * sinY + z3 * cosY;
-        // Pitch rotation (X axis)
-        const ry = y3 * cosP - rz * sinP;
-        const rz2 = y3 * sinP + rz * cosP;
-
-        const perspective = focal / (focal + rz2 * focal * 0.7 + focal);
-        projX[i] = cx + rx * scale * perspective;
-        projY[i] = cy + ry * scale * perspective;
-        projD[i] = rz2;
-        projZ[i] = nd.z;
-      }
-
-      // ── Draw edges ────────────────────────────────────────────────────
-      const edgeAlphaBase = 0.25 + sectionIntensity * 0.35;
-      for (let row = 0; row < ROWS; row++) {
-        for (let col = 0; col < COLS; col++) {
-          const i = row * COLS + col;
-          const nd = spheresRef.current[i];
-
-          // Horizontal edge (col → col+1)
-          if (col < COLS - 1) {
-            const j = i + 1;
-            const tension = Math.abs(projZ[i] - projZ[j]);
-            const avgZ    = (Math.abs(projZ[i]) + Math.abs(projZ[j])) * 0.5;
-            const brightness = Math.min(1, tension * 4 + avgZ * 1.5);
-            const colorIdx = Math.floor(nd.hue * liveColors.length) % liveColors.length;
-            const color = liveColors[colorIdx];
-
-            ctx.strokeStyle = color;
-            ctx.lineWidth   = 0.5 + brightness * 2.5;
-            ctx.globalAlpha = edgeAlphaBase * (0.3 + brightness * 0.7);
-            ctx.shadowColor = color;
-            ctx.shadowBlur  = perf ? 0 : brightness * 12;
-            ctx.beginPath();
-            ctx.moveTo(projX[i], projY[i]);
-            ctx.lineTo(projX[j], projY[j]);
-            ctx.stroke();
-          }
-
-          // Vertical edge (row → row+1)
-          if (row < ROWS - 1) {
-            const j = i + COLS;
-            const tension = Math.abs(projZ[i] - projZ[j]);
-            const avgZ    = (Math.abs(projZ[i]) + Math.abs(projZ[j])) * 0.5;
-            const brightness = Math.min(1, tension * 4 + avgZ * 1.5);
-            const colorIdx = Math.floor((1 - nd.hue) * liveColors.length) % liveColors.length;
-            const color = liveColors[colorIdx];
-
-            ctx.strokeStyle = color;
-            ctx.lineWidth   = 0.5 + brightness * 2.5;
-            ctx.globalAlpha = edgeAlphaBase * (0.3 + brightness * 0.7);
-            ctx.shadowColor = color;
-            ctx.shadowBlur  = perf ? 0 : brightness * 12;
-            ctx.beginPath();
-            ctx.moveTo(projX[i], projY[i]);
-            ctx.lineTo(projX[j], projY[j]);
-            ctx.stroke();
-          }
-        }
-      }
+      const maxDist = minDim * (0.16 + mids * 0.05);
+      const maxD2   = maxDist * maxDist;
+      ctx.globalCompositeOperation = 'lighter';
       ctx.shadowBlur = 0;
-
-      // ── Draw nodes (sorted back-to-front for depth) ───────────────────
-      const order = Array.from({ length: N }, (_, i) => i).sort((a, b) => projD[a] - projD[b]);
-      for (const i of order) {
-        const nd    = spheresRef.current[i];
-        const absZ  = Math.abs(projZ[i]);
-        if (absZ < 0.01) continue;  // flat nodes invisible
-        const colorIdx = Math.floor(nd.hue * liveColors.length) % liveColors.length;
-        const color = liveColors[colorIdx];
-        const size  = Math.max(1.2, (2.0 + absZ * minDim * 0.055) * (0.5 + sectionIntensity * 0.5));
-        const alpha = 0.5 + absZ * 1.2;
-
-        // Outer glow
-        ctx.globalAlpha = Math.min(0.9, alpha * 0.55);
-        ctx.fillStyle   = color;
-        ctx.shadowColor = color;
-        ctx.shadowBlur  = perf ? 0 : 6 + absZ * 22;
-        ctx.beginPath(); ctx.arc(projX[i], projY[i], size * 1.6, 0, Math.PI * 2); ctx.fill();
-
-        // Bright core
-        ctx.globalAlpha = Math.min(1, alpha);
-        ctx.fillStyle   = absZ > 0.2 ? '#ffffff' : color;
-        ctx.shadowBlur  = 0;
-        ctx.beginPath(); ctx.arc(projX[i], projY[i], size * 0.55, 0, Math.PI * 2); ctx.fill();
-      }
-      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-
-      // ── Beat flash: concentric rings from centre ───────────────────────
-      if (burst > 0.30 && onset > 0.04) {
-        for (let r = 0; r < 3; r++) {
-          const ringR = minDim * (0.06 + r * 0.07 + burst * 0.12);
-          const color = liveColors[r % liveColors.length];
-          ctx.strokeStyle = color;
-          ctx.lineWidth   = (2.5 - r * 0.6) * burst;
-          ctx.globalAlpha = burst * (0.7 - r * 0.2);
-          ctx.shadowColor = color; ctx.shadowBlur = 10 + burst * 16;
-          ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI * 2); ctx.stroke();
+      for (let i = 0; i < COUNT; i++) {
+        const a = nodes[i];
+        for (let j = i + 1; j < COUNT; j++) {
+          const b = nodes[j];
+          const ddx = a.x - b.x, ddy = a.y - b.y;
+          const d2 = ddx * ddx + ddy * ddy;
+          if (d2 > maxD2) continue;
+          const d = Math.sqrt(d2);
+          const closeness = 1 - d / maxDist;
+          const sparkle = 0.6 + 0.4 * Math.sin(a.twinkle + b.twinkle) * highs;
+          const alpha = closeness * closeness * (0.10 + energy * 0.22 + burst * 0.12) * sparkle;
+          if (alpha < 0.004) continue;
+          const col = liveColors[(i + j) % liveColors.length];
+          ctx.strokeStyle = `rgba(${hexToRgb(col, hxCache)},${alpha})`;
+          ctx.lineWidth = 0.6 + closeness * 1.4;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
         }
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
       }
 
-      // ── Ambient background grid fog ────────────────────────────────────
-      if (!perf && sectionIntensity > 0.3) {
-        const fogGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, minDim * 0.6);
-        fogGrad.addColorStop(0,   `rgba(${hexToRgb(liveColors[0], hxCache)}, ${0.04 + sectionIntensity * 0.06})`);
-        fogGrad.addColorStop(0.6, `rgba(${hexToRgb(liveColors[1], hxCache)}, ${0.02 + sectionIntensity * 0.03})`);
-        fogGrad.addColorStop(1,   'rgba(0,0,0,0)');
-        ctx.fillStyle = fogGrad; ctx.globalAlpha = 1;
-        ctx.beginPath(); ctx.arc(cx, cy, minDim * 0.6, 0, Math.PI * 2); ctx.fill();
+      for (let i = 0; i < COUNT; i++) {
+        const n = nodes[i];
+        const col = liveColors[Math.floor(n.hue * liveColors.length) % liveColors.length];
+        const rgbCol = hexToRgb(col, hxCache);
+        const tw = 0.7 + 0.3 * Math.sin(n.twinkle);
+        const baseSize = (1.4 + n.depth * 2.2) * (1 + burst * 0.45);   // particles pop on beats
+        const glow = baseSize * (2.6 + bass * 2.0 + burst * 2.2);
+        if (!perf) {
+          const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, glow);
+          g.addColorStop(0, `rgba(${rgbCol},${0.16 * tw * (0.6 + energy * 0.6)})`);
+          g.addColorStop(1, `rgba(${rgbCol},0)`);
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(n.x, n.y, glow, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.fillStyle = `rgba(${rgbCol},${0.9 * tw})`;
+        ctx.beginPath(); ctx.arc(n.x, n.y, baseSize * (0.7 + n.depth * 0.4), 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(255,255,255,${0.5 * tw * n.depth})`;
+        ctx.beginPath(); ctx.arc(n.x, n.y, baseSize * 0.35, 0, Math.PI * 2); ctx.fill();
       }
 
+      if (burst > 0.06) {
+        const ringR = fieldR * (0.45 + (1 - burst) * 0.8);
+        const col = liveColors[0];
+        const g = ctx.createRadialGradient(cx, cy, ringR * 0.65, cx, cy, ringR * 1.3);
+        g.addColorStop(0,   'rgba(0,0,0,0)');
+        g.addColorStop(0.7, `rgba(${hexToRgb(col, hxCache)},${burst * 0.20})`);
+        g.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(cx, cy, ringR * 1.3, 0, Math.PI * 2); ctx.fill();
+      }
+
+      ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1; ctx.shadowBlur = 0;
 
-    // ── Fractal Kaleidoscope (new) ────────────────────────────────────────
     } else if (eng === 'fractal') {
       ctx.fillStyle = 'rgba(2,2,10,0.22)';
       ctx.fillRect(0, 0, w, h);
