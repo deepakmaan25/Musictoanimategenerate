@@ -118,15 +118,15 @@ const ENGINE_COLORS: Record<string, { bg: string; border: string; text: string; 
 // ── Per-engine optimal motion defaults ────────────────────────────────────────
 type MotionDefaults = { beatSensitivity: number; particleDensity: number; smoothing: number; baseSpeed: number; beatResponse: number };
 const ENGINE_MOTION_DEFAULTS: Record<string, MotionDefaults> = {
-  bars:         { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
-  radial:       { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
-  orbital:      { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
-  depth:        { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
-  terrain:      { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.75, baseSpeed: 1.0, beatResponse: 0.90 },
-  tunnel:       { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
-  neon_spheres: { beatSensitivity: 0.8, particleDensity: 0.97, smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
-  fractal:      { beatSensitivity: 0.8, particleDensity: 1.0,  smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
-  solar:        { beatSensitivity: 0.8, particleDensity: 0.95, smoothing: 0.92, baseSpeed: 1.0, beatResponse: 0.90 },
+  bars:         { beatSensitivity: 0.95, particleDensity: 1.0,  smoothing: 0.82, baseSpeed: 1.0, beatResponse: 0.90 },
+  radial:       { beatSensitivity: 0.95, particleDensity: 1.0,  smoothing: 0.82, baseSpeed: 1.0, beatResponse: 0.90 },
+  orbital:      { beatSensitivity: 0.95, particleDensity: 1.0,  smoothing: 0.82, baseSpeed: 1.0, beatResponse: 0.90 },
+  depth:        { beatSensitivity: 0.95, particleDensity: 1.0,  smoothing: 0.82, baseSpeed: 1.0, beatResponse: 0.90 },
+  terrain:      { beatSensitivity: 0.95, particleDensity: 1.0,  smoothing: 0.82, baseSpeed: 1.0, beatResponse: 0.90 },
+  tunnel:       { beatSensitivity: 0.95, particleDensity: 1.0,  smoothing: 0.82, baseSpeed: 1.0, beatResponse: 0.90 },
+  neon_spheres: { beatSensitivity: 0.95, particleDensity: 0.97, smoothing: 0.82, baseSpeed: 1.0, beatResponse: 0.90 },
+  fractal:      { beatSensitivity: 0.95, particleDensity: 1.0,  smoothing: 0.82, baseSpeed: 1.0, beatResponse: 0.90 },
+  solar:        { beatSensitivity: 0.95, particleDensity: 0.95, smoothing: 0.82, baseSpeed: 1.0, beatResponse: 0.90 },
 };
 
 // ─── Engine style variants ────────────────────────────────────────────────────
@@ -271,9 +271,9 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
   const [engine, setEngine]                   = useState<EngineId>((stored?.engineId as EngineId) ?? initialEngine);
   const [variant, setVariant]                 = useState<string>(''); // '' = first/default variant
   const [palette, setPalette]                 = useState(stored?.style.palette ?? 0);
-  const [beatSensitivity, setBeatSensitivity] = useState(stored?.motion.beatSensitivity ?? 0.8);
+  const [beatSensitivity, setBeatSensitivity] = useState(stored?.motion.beatSensitivity ?? 0.95);
   const [particleDensity, setParticleDensity] = useState(stored?.motion.particleDensity ?? 0.6);
-  const [smoothing, setSmoothing]             = useState(stored?.motion.smoothing ?? ENGINE_MOTION_DEFAULTS[initialEngine]?.smoothing ?? 0.92);
+  const [smoothing, setSmoothing]             = useState(stored?.motion.smoothing ?? ENGINE_MOTION_DEFAULTS[initialEngine]?.smoothing ?? 0.82);
   const [perfMode, setPerfMode]               = useState(false);
   const [baseSpeed, setBaseSpeed]             = useState(0.15);   // gentle cruise by default
   const [beatResponse, setBeatResponse]       = useState(0.55);   // noticeable but not chaotic
@@ -1738,7 +1738,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
       const cx = w / 2, cy = h / 2;
       const minDim = Math.min(w, h);
 
-      const COUNT = perf ? 56 : 90;
+      const COUNT = perf ? 44 : 68;
       if (!spheresRef.current || spheresRef.current.length !== COUNT) {
         spheresRef.current = Array.from({ length: COUNT }, () => ({
           x: 0, y: 0, vx: 0, vy: 0,
@@ -1760,7 +1760,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
       ctx.fillStyle = `rgba(5,5,12,${0.20 + (1 - sectionIntensity) * 0.06})`;
       ctx.fillRect(0, 0, w, h);
 
-      const fieldR = minDim * (0.42 + bass * 0.10 * sens + burst * 0.14);  // beats push field out
+      const fieldR = minDim * (0.52 + bass * 0.12 * sens + burst * 0.14);  // wider spread, beats push out
       const breath = 1 - burst * 0.18;                                     // stronger beat pull
 
       for (let i = 0; i < COUNT; i++) {
@@ -1776,7 +1776,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
         n.twinkle += 0.016 * (1.5 + highs * 4);
       }
 
-      const maxDist = minDim * (0.16 + mids * 0.05);
+      const maxDist = minDim * (0.20 + mids * 0.06);
       const maxD2   = maxDist * maxDist;
       ctx.globalCompositeOperation = 'lighter';
       ctx.shadowBlur = 0;
@@ -1790,11 +1790,11 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
           const d = Math.sqrt(d2);
           const closeness = 1 - d / maxDist;
           const sparkle = 0.6 + 0.4 * Math.sin(a.twinkle + b.twinkle) * highs;
-          const alpha = closeness * closeness * (0.10 + energy * 0.22 + burst * 0.12) * sparkle;
+          const alpha = closeness * closeness * (0.16 + energy * 0.30 + burst * 0.14) * sparkle;
           if (alpha < 0.004) continue;
           const col = liveColors[(i + j) % liveColors.length];
           ctx.strokeStyle = `rgba(${hexToRgb(col, hxCache)},${alpha})`;
-          ctx.lineWidth = 0.6 + closeness * 1.4;
+          ctx.lineWidth = 0.9 + closeness * 1.8;
           ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
         }
       }
@@ -1804,19 +1804,19 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
         const col = liveColors[Math.floor(n.hue * liveColors.length) % liveColors.length];
         const rgbCol = hexToRgb(col, hxCache);
         const tw = 0.7 + 0.3 * Math.sin(n.twinkle);
-        const baseSize = (1.4 + n.depth * 2.2) * (1 + burst * 0.45);   // particles pop on beats
-        const glow = baseSize * (2.6 + bass * 2.0 + burst * 2.2);
+        const baseSize = (2.6 + n.depth * 3.6) * (1 + burst * 0.45);   // larger, more prominent particles
+        const glow = baseSize * (3.0 + bass * 2.2 + burst * 2.4);
         if (!perf) {
           const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, glow);
-          g.addColorStop(0, `rgba(${rgbCol},${0.16 * tw * (0.6 + energy * 0.6)})`);
+          g.addColorStop(0, `rgba(${rgbCol},${0.26 * tw * (0.6 + energy * 0.6)})`);
           g.addColorStop(1, `rgba(${rgbCol},0)`);
           ctx.fillStyle = g;
           ctx.beginPath(); ctx.arc(n.x, n.y, glow, 0, Math.PI * 2); ctx.fill();
         }
-        ctx.fillStyle = `rgba(${rgbCol},${0.9 * tw})`;
-        ctx.beginPath(); ctx.arc(n.x, n.y, baseSize * (0.7 + n.depth * 0.4), 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = `rgba(255,255,255,${0.5 * tw * n.depth})`;
-        ctx.beginPath(); ctx.arc(n.x, n.y, baseSize * 0.35, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(${rgbCol},${Math.min(1, 1.05 * tw)})`;
+        ctx.beginPath(); ctx.arc(n.x, n.y, baseSize * (0.85 + n.depth * 0.45), 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(255,255,255,${0.7 * tw * n.depth})`;
+        ctx.beginPath(); ctx.arc(n.x, n.y, baseSize * 0.42, 0, Math.PI * 2); ctx.fill();
       }
 
       if (burst > 0.06) {
