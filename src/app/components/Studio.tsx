@@ -4101,10 +4101,12 @@ function Slider({ label, value, onChange, min, max, step }: {
 }) {
   return (
     <div>
-      <div className="text-xs uppercase tracking-wider text-gray-400 mb-2">{label}</div>
+      <div className="flex items-baseline justify-between mb-2">
+        <span className="text-xs uppercase tracking-wider text-gray-400">{label}</span>
+        <span className="text-xs font-semibold tabular-nums text-gray-200">{Math.round(value * 100)}%</span>
+      </div>
       <input type="range" min={min} max={max} step={step} value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))} className="w-full" />
-      <div className="text-xs text-gray-400 mt-1">{Math.round(value * 100)}%</div>
     </div>
   );
 }
