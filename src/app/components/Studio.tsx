@@ -158,10 +158,8 @@ const VARIANTS: Partial<Record<EngineId, { id: string; label: string; descriptio
     { id: 'helix', label: 'Helix', description: 'Stacked rings twist into a DNA double helix' },
   ],
   tunnel: [
-    { id: 'aurora',   label: 'Aurora',   description: 'Layered horizontal ribbon curtains (default)' },
-    { id: 'vertical', label: 'Vertical', description: 'Vertical ribbon columns — like a visualizer waterfall' },
-    { id: 'spiral',   label: 'Spiral',   description: 'Vanishing-point rings collapse inward like a tunnel' },
-    { id: 'wave',     label: 'Wave',     description: 'Concentric sine waves ripple outward from centre' },
+    { id: 'curtains', label: 'Curtains', description: 'Vertical curtains of light sway and drape (default)' },
+    { id: 'ribbons',  label: 'Ribbons',  description: 'Horizontal flowing light bands wave across the screen' },
   ],
   solar: [
     { id: 'radial', label: 'Radial',  description: 'Shockwaves ripple through concentric dot rings (default)' },
@@ -174,10 +172,8 @@ const VARIANTS: Partial<Record<EngineId, { id: string; label: string; descriptio
     { id: 'ocean',     label: 'Ocean',     description: 'Rolling fluid waves — amplitude tied to bass' },
   ],
   neon_spheres: [
-    { id: 'web',     label: 'Web',     description: 'Flat perspective grid — edges glow by string tension (default)' },
-    { id: 'ripple',  label: 'Ripple',  description: 'Concentric wave rings propagate outward from the centre' },
-    { id: 'sphere',  label: 'Sphere',  description: 'Nodes mapped onto a sphere surface, morphs with audio' },
-    { id: 'shatter', label: 'Shatter', description: 'Grid shatters on every drop and spring-reassembles' },
+    { id: 'constellation', label: 'Constellation', description: 'Particles drift freely, connecting into a living web (default)' },
+    { id: 'orbits',        label: 'Orbits',        description: 'Particles travel in concentric circular currents' },
   ],
   fractal: [
     { id: 'kaleido', label: 'Kaleidoscope', description: 'True mirror symmetry across wedges (default)' },
@@ -1628,6 +1624,74 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
       const minDim = Math.min(w, h);
       const NCURTAIN = perf ? 5 : 7;
       const SEG = perf ? 14 : 22;
+      if (vrnt === 'ribbons') {
+        // ── Ribbons: horizontal flowing light bands (variant) ──────────────
+        const NRIB = perf ? 5 : 6;
+        const RSEG = perf ? 26 : 40;
+        if (!spheresRef.current || spheresRef.current.length !== NRIB
+            || (spheresRef.current as unknown as ResonanceNode[])[0]?.depth !== 7) {
+          spheresRef.current = Array.from({ length: NRIB }, (_, i) => ({
+            x: 0, y: 0, vx: 0, vy: 0,
+            hx: (i + 0.5) / NRIB, hy: 0.04 + Math.random() * 0.04,
+            driftA: Math.random() * Math.PI * 2, driftR: 0,
+            driftSpd: 0.2 + Math.random() * 0.3, phase: Math.random() * Math.PI * 2,
+            depth: 7, hue: i / NRIB, twinkle: 0, size: 0,
+          })) as unknown as Sphere[];
+        }
+        const ribs = spheresRef.current as unknown as ResonanceNode[];
+        ctx.fillStyle = `rgba(2,2,10,${0.22 + (1 - sectionIntensity) * 0.06})`;
+        ctx.fillRect(0, 0, w, h);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.shadowBlur = 0;
+        for (let ri = 0; ri < NRIB; ri++) {
+          const r = ribs[ri];
+          r.driftA += r.driftSpd * 0.016 * (0.6 + mids * 0.7);
+          const bandLo = Math.floor((ri / NRIB) * freq.length * 0.5);
+          const drive = Math.min(1, avg(freq, bandLo, bandLo + 20) * sens * energyMult);
+          const col = liveColors[Math.floor(r.hue * liveColors.length) % liveColors.length];
+          const rgbCol = hexToRgb(col, hxCache);
+          const thick = minDim * (0.04 + drive * 0.05 + burst * 0.03);
+          let pL = 0, pTy = 0, pBy = 0;
+          for (let s = 0; s <= RSEG; s++) {
+            const f = s / RSEG, x = f * w;
+            const wave = Math.sin(f * 4 + r.driftA) * r.hy * h * (1 + bass * 0.6)
+                       + Math.sin(f * 7 - r.driftA * 1.3) * r.hy * 0.5 * h * drive;
+            const yC = r.hx * h + wave;
+            const ripple = 0.5 + 0.5 * Math.sin(f * 6 - t * 2 + r.driftA);
+            const a = (0.05 + drive * 0.22 + burst * 0.12) * ripple * Math.sin(f * Math.PI);
+            const half = thick * (0.4 + 0.6 * Math.sin(f * Math.PI));
+            if (s > 0 && a > 0.004) {
+              const g = ctx.createLinearGradient(0, yC - half, 0, yC + half);
+              g.addColorStop(0, `rgba(${rgbCol},0)`);
+              g.addColorStop(0.5, `rgba(${rgbCol},${a})`);
+              g.addColorStop(1, `rgba(${rgbCol},0)`);
+              ctx.fillStyle = g;
+              ctx.beginPath();
+              ctx.moveTo(pL, pTy); ctx.lineTo(x, yC - half);
+              ctx.lineTo(x, yC + half); ctx.lineTo(pL, pBy);
+              ctx.closePath(); ctx.fill();
+            }
+            pL = x; pTy = yC - half; pBy = yC + half;
+          }
+          ctx.strokeStyle = `rgba(${rgbCol},${0.10 + drive * 0.25})`;
+          ctx.lineWidth = 1.2 + drive * 2;
+          ctx.beginPath();
+          for (let s = 0; s <= RSEG; s++) {
+            const f = s / RSEG;
+            const wave = Math.sin(f * 4 + r.driftA) * r.hy * h * (1 + bass * 0.6)
+                       + Math.sin(f * 7 - r.driftA * 1.3) * r.hy * 0.5 * h * drive;
+            if (s === 0) ctx.moveTo(f * w, r.hx * h + wave); else ctx.lineTo(f * w, r.hx * h + wave);
+          }
+          ctx.stroke();
+        }
+        if (burst > 0.05) {
+          const g = ctx.createLinearGradient(0, 0, 0, h * 0.6);
+          g.addColorStop(0, `rgba(${hexToRgb(liveColors[0], hxCache)},${burst * 0.18})`);
+          g.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = g; ctx.fillRect(0, 0, w, h * 0.6);
+        }
+      } else {
+
 
       // Lazy-init curtains (stored in spheresRef — unused by other engines here)
       if (!spheresRef.current || spheresRef.current.length !== NCURTAIN) {
@@ -1722,6 +1786,7 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
         g.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = g; ctx.fillRect(0, 0, w, h * 0.6);
       }
+      }
 
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1; ctx.shadowBlur = 0;
@@ -1773,17 +1838,43 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
       const fieldR = minDim * (0.52 + bass * 0.12 * sens + burst * 0.14);  // wider spread, beats push out
       const breath = 1 - burst * 0.18;                                     // stronger beat pull
 
-      for (let i = 0; i < COUNT; i++) {
-        const n = nodes[i];
-        n.driftA += n.driftSpd * 0.016 * (0.6 + mids * 0.8);
-        const dx  = Math.cos(n.driftA) * n.driftR;
-        const dy  = Math.sin(n.driftA * 0.8) * n.driftR;
-        const bob = Math.sin(t * 0.7 + n.phase) * 0.05 * (0.5 + energy * 0.5);
-        const px  = (n.hx + dx) * breath;
-        const py  = (n.hy + dy + bob) * breath;
-        n.x = cx + px * fieldR;
-        n.y = cy + py * fieldR;
-        n.twinkle += 0.016 * (1.5 + highs * 4);
+      if (vrnt === 'orbits') {
+        // ── Orbits: particles travel in concentric circular currents ───────
+        // Derive a ring index + direction from each node's existing fields so
+        // no re-init is needed. Alternating rings counter-rotate.
+        const RINGS = 4;
+        // faint current-ring guides
+        ctx.globalCompositeOperation = 'lighter';
+        for (let ring = 0; ring < RINGS; ring++) {
+          const rr = (0.18 + ring * 0.12) * minDim * (1 + bass * 0.06 * sens);
+          ctx.strokeStyle = `rgba(${hexToRgb(liveColors[ring % liveColors.length], hxCache)},0.05)`;
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke();
+        }
+        for (let i = 0; i < COUNT; i++) {
+          const n = nodes[i];
+          const ring = i % RINGS;
+          const dir = ring % 2 === 0 ? 1 : -1;
+          n.driftA += dir * n.driftSpd * 0.016 * (0.6 + mids * 0.8) * (1 + bass * 0.4);
+          const rr = (0.18 + ring * 0.12 + (n.hue - 0.5) * 0.04) * minDim
+                   * (1 + bass * 0.08 * sens + burst * 0.10);
+          n.x = cx + Math.cos(n.driftA) * rr;
+          n.y = cy + Math.sin(n.driftA) * rr;
+          n.twinkle += 0.016 * (1.5 + highs * 4);
+        }
+      } else {
+        for (let i = 0; i < COUNT; i++) {
+          const n = nodes[i];
+          n.driftA += n.driftSpd * 0.016 * (0.6 + mids * 0.8);
+          const dx  = Math.cos(n.driftA) * n.driftR;
+          const dy  = Math.sin(n.driftA * 0.8) * n.driftR;
+          const bob = Math.sin(t * 0.7 + n.phase) * 0.05 * (0.5 + energy * 0.5);
+          const px  = (n.hx + dx) * breath;
+          const py  = (n.hy + dy + bob) * breath;
+          n.x = cx + px * fieldR;
+          n.y = cy + py * fieldR;
+          n.twinkle += 0.016 * (1.5 + highs * 4);
+        }
       }
 
       const maxDist = minDim * (0.20 + mids * 0.06);
