@@ -3046,10 +3046,10 @@ recorder.start(200);
                  // Desktop: no inline height — CSS flex handles it
                  typeof window !== 'undefined' && window.innerWidth >= 1024 ? undefined :
                  // Mobile: use dvh so the canvas fills real visible viewport (avoids address bar cutoff)
-                 // 9:16 gets 72% — tall enough to feel immersive, leaves room for transport
+                 // 9:16 (hero format) gets 78% — immersive portrait preview, still leaves room for transport
                  // 1:1  gets natural square via vw cap
                  // 16:9 gets a wide bar
-                 aspect === '9:16' ? 'min(72dvh, 72vh, 480px)'
+                 aspect === '9:16' ? 'min(78dvh, 78vh, 560px)'
                  : aspect === '1:1' ? 'min(88vw, 420px)'
                  : 'min(96vw, 520px)'
                ),
@@ -3800,7 +3800,7 @@ recorder.start(200);
                           ? { background: ENGINE_COLORS[engine]?.bg ?? 'rgba(255,255,255,0.10)', borderColor: ENGINE_COLORS[engine]?.border ?? 'rgba(255,255,255,0.40)' }
                           : { background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.15)' }}>
                         <div className="font-semibold text-xs" style={{ color: aspect === a.id ? (ENGINE_COLORS[engine]?.text ?? '#ffffff') : '#ffffff' }}>{a.label}</div>
-                        <div className="text-[10px]" style={{ opacity: aspect === a.id ? 0.7 : 0.5 }}>{a.sub}</div>
+                        <div className="text-[9px] sm:text-[10px] leading-tight break-words" style={{ opacity: aspect === a.id ? 0.75 : 0.55 }}>{a.sub}</div>
                       </button>
                     ))}
                   </div>
@@ -3991,22 +3991,22 @@ recorder.start(200);
                             {/* Progress */}
                             {isActive && (
                               <div className="mb-2">
-                                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden mb-1">
-                                  <div className="h-full rounded-full transition-all duration-300"
+                                <div className="h-2.5 bg-white/10 rounded-full overflow-hidden mb-1.5">
+                                  <div className="export-progress-shimmer h-full rounded-full transition-all duration-300"
                                     style={{
                                       width: `${job.progress}%`,
                                       background: 'linear-gradient(to right, #a855f7, #ec4899)',
                                     }} />
                                 </div>
-                                <div className="flex items-center justify-between">
-                                  <span className="text-[10px] text-gray-400">
-                                    {job.status === 'finalizing' ? 'Finalizing…' : `${Math.round(job.progress)}%`}
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] font-medium text-gray-300">
+                                    {job.status === 'finalizing' ? 'Finalizing…' : `Recording · ${Math.round(job.progress)}%`}
                                   </span>
                                   <button onClick={() => {
                                     exportCancelRef.current = true;
                                     recorderRef.current?.stop();
-                                  }} className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">
-                                    Cancel
+                                  }} className="flex items-center gap-1 text-[10px] font-medium text-gray-300 px-2 py-1 rounded-md border border-white/15 bg-white/5 hover:bg-red-500/15 hover:border-red-400/40 hover:text-red-300 transition-colors shrink-0">
+                                    <X className="size-2.5" /> Cancel
                                   </button>
                                 </div>
                               </div>
