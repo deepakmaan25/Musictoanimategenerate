@@ -3361,8 +3361,8 @@ recorder.start(200);
                     preserveAspectRatio="none" aria-hidden="true">
                     <defs>
                       <linearGradient id="wfGrad" x1="0" y1="0" x2="1000" y2="0" gradientUnits="userSpaceOnUse">
-                        <stop offset="0%" stopColor="#a855f7" />
-                        <stop offset="100%" stopColor="#ec4899" />
+                        <stop offset="0%" stopColor="#D8FF3E" />
+                        <stop offset="100%" stopColor="#C2E82B" />
                       </linearGradient>
                       <clipPath id="wfPlayed">
                         <rect x="0" y="0" width={Math.max(0, pct * 10)} height="28" />
@@ -3393,7 +3393,7 @@ recorder.start(200);
                   const tickPct = (sec.startSec / project.duration) * 100;
                   const color =
                     sec.label === 'drop'      ? '#f59e0b' :
-                    sec.label === 'chorus'    ? '#a855f7' :
+                    sec.label === 'chorus'    ? '#D8FF3E' :
                     sec.label === 'verse'     ? '#3b82f6' :
                     sec.label === 'breakdown' ? '#6366f1' : '#ffffff';
                   return (
@@ -3409,9 +3409,9 @@ recorder.start(200);
                       style={{
                         left:    `${loopStart * 100}%`,
                         width:   `${(loopEnd - loopStart) * 100}%`,
-                        background: 'rgba(168,85,247,0.18)',
-                        borderTop: '1.5px solid rgba(168,85,247,0.7)',
-                        borderBottom: '1.5px solid rgba(168,85,247,0.7)',
+                        background: 'rgba(216,255,62,0.16)',
+                        borderTop: '1.5px solid rgba(216,255,62,0.7)',
+                        borderBottom: '1.5px solid rgba(216,255,62,0.7)',
                       }} />
                     {/* Start handle */}
                     <div className="absolute top-0 bottom-0 w-3 -ml-1.5 flex items-center justify-center cursor-ew-resize z-10"
@@ -3536,8 +3536,8 @@ recorder.start(200);
                             onClick={() => setEngine(rec.engineId)}
                             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-all hover:opacity-90"
                             style={engine === rec.engineId
-                              ? { background: ENGINE_COLORS[rec.engineId]?.bg ?? 'rgba(168,85,247,0.20)', borderColor: ENGINE_COLORS[rec.engineId]?.border ?? 'rgba(168,85,247,0.50)', color: ENGINE_COLORS[rec.engineId]?.text ?? '#e9d5ff' }
-                              : { background: ENGINE_COLORS[rec.engineId]?.chip ?? 'rgba(168,85,247,0.10)', borderColor: 'rgba(255,255,255,0.10)', color: ENGINE_COLORS[rec.engineId]?.chipText ?? '#d8b4fe' }}
+                              ? { background: ENGINE_COLORS[rec.engineId]?.bg ?? 'rgba(216,255,62,0.16)', borderColor: ENGINE_COLORS[rec.engineId]?.border ?? 'rgba(216,255,62,0.45)', color: ENGINE_COLORS[rec.engineId]?.text ?? '#D8FF3E' }
+                              : { background: ENGINE_COLORS[rec.engineId]?.chip ?? 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.10)', color: ENGINE_COLORS[rec.engineId]?.chipText ?? '#cbd5e1' }}
                           >
                             {engineName}
                             <span className="text-[9px] opacity-60">★</span>
@@ -3665,7 +3665,7 @@ recorder.start(200);
                                     title={v.description}
                                     className="px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all"
                                     style={active
-                                      ? { background: ENGINE_COLORS[e.id]?.chip ?? 'rgba(168,85,247,0.20)', borderColor: ENGINE_COLORS[e.id]?.chipBorder ?? 'rgba(168,85,247,0.50)', color: ENGINE_COLORS[e.id]?.chipText ?? '#e9d5ff' }
+                                      ? { background: ENGINE_COLORS[e.id]?.chip ?? 'rgba(216,255,62,0.16)', borderColor: ENGINE_COLORS[e.id]?.chipBorder ?? 'rgba(216,255,62,0.45)', color: ENGINE_COLORS[e.id]?.chipText ?? '#D8FF3E' }
                                       : { background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.10)', color: '#9ca3af' }}
                                   >
                                     {v.label}
@@ -3995,7 +3995,7 @@ recorder.start(200);
                                   <div className="export-progress-shimmer h-full rounded-full transition-all duration-300"
                                     style={{
                                       width: `${job.progress}%`,
-                                      background: 'linear-gradient(to right, #a855f7, #ec4899)',
+                                      background: '#D8FF3E',
                                     }} />
                                 </div>
                                 <div className="flex items-center justify-between gap-2">
