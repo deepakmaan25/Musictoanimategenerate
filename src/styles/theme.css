@@ -315,3 +315,59 @@
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--signal) 50%, var(--hairline));
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Studio light-mode chrome.
+   The studio is dark-first; the canvas MUST stay dark (animations are
+   light-on-black). When the global theme is light (html:not(.dark)), we
+   repaint only the studio CHROME to a warm "paper" palette — never the
+   canvas (.studio-canvas) or its overlays.
+   ───────────────────────────────────────────────────────────────────────── */
+html:not(.dark) .studio-root {
+  background: #F4F2ED !important;   /* paper shell (overrides from-black gradient) */
+  color: #16181C;
+}
+/* Text: light-mode readable greys */
+html:not(.dark) .studio-root .text-white { color: #16181C !important; }
+html:not(.dark) .studio-root .text-gray-200 { color: #2A2D31 !important; }
+html:not(.dark) .studio-root .text-gray-300 { color: #3A4048 !important; }
+html:not(.dark) .studio-root .text-gray-400 { color: #5A6068 !important; }
+html:not(.dark) .studio-root .text-gray-500 { color: #6B7178 !important; }
+
+/* Surfaces: white/x → ink/x so panels read as light cards */
+html:not(.dark) .studio-root .bg-white\/5  { background-color: rgba(11,12,14,0.04) !important; }
+html:not(.dark) .studio-root .bg-white\/8  { background-color: rgba(11,12,14,0.06) !important; }
+html:not(.dark) .studio-root .bg-white\/10 { background-color: rgba(11,12,14,0.07) !important; }
+
+/* Borders */
+html:not(.dark) .studio-root .border-white\/5  { border-color: rgba(11,12,14,0.06) !important; }
+html:not(.dark) .studio-root .border-white\/8  { border-color: rgba(11,12,14,0.08) !important; }
+html:not(.dark) .studio-root .border-white\/10 { border-color: rgba(11,12,14,0.10) !important; }
+html:not(.dark) .studio-root .border-white\/15 { border-color: rgba(11,12,14,0.14) !important; }
+html:not(.dark) .studio-root .border-white\/20 { border-color: rgba(11,12,14,0.18) !important; }
+
+/* Hover states */
+html:not(.dark) .studio-root .hover\:bg-white\/10:hover { background-color: rgba(11,12,14,0.08) !important; }
+html:not(.dark) .studio-root .hover\:bg-white\/5:hover  { background-color: rgba(11,12,14,0.05) !important; }
+
+/* Tabs in light studio: keep visible (dark text on paper) */
+html:not(.dark) .studio-root [data-state="active"] { color: #16181C !important; background-color: rgba(11,12,14,0.08) !important; }
+html:not(.dark) .studio-root .\!text-gray-400 { color: #5A6068 !important; }
+
+/* CRITICAL: the canvas and its overlays stay dark, always */
+html:not(.dark) .studio-canvas,
+html:not(.dark) .studio-canvas * {
+  /* let the canvas keep its own bg-black + overlay styles; don't repaint */
+}
+html:not(.dark) .studio-canvas { background: #000 !important; }
+
+/* Canvas overlays keep their dark-on-dark styling (white text on black panels) */
+html:not(.dark) .studio-canvas .text-white { color: #ffffff !important; }
+html:not(.dark) .studio-canvas .text-gray-200,
+html:not(.dark) .studio-canvas .text-gray-300,
+html:not(.dark) .studio-canvas .text-gray-400 { color: rgba(255,255,255,0.7) !important; }
+html:not(.dark) .studio-canvas .bg-white\/5,
+html:not(.dark) .studio-canvas .bg-white\/8,
+html:not(.dark) .studio-canvas .bg-white\/10 { background-color: rgba(255,255,255,0.1) !important; }
+html:not(.dark) .studio-canvas .border-white\/10,
+html:not(.dark) .studio-canvas .border-white\/15 { border-color: rgba(255,255,255,0.12) !important; }
