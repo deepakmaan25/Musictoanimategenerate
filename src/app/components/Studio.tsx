@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { drawEngine } from '../engines';
 import { Play, Pause, Upload, Download, ArrowLeft, RotateCw, FileVideo, Check,
         Loader2, AlertCircle, Share2, Monitor, Smartphone, CloudOff, Cloud, X, Trash2,
-        Maximize2, Minimize2, Zap, Shuffle, Star, Trash, Sun, Moon } from 'lucide-react';
+        Maximize2, Minimize2, Zap, Shuffle, Star, Trash } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { AuthModal } from './AuthModal';
 import type { usePersistentProjects } from '../hooks/usePersistentProjects';
 import { useAuth } from '../hooks/useAuth';
-import { useTheme } from '../hooks/useTheme';
 import { useSupabaseSync } from '../hooks/useSupabaseSync';
 import { fetchProjectTrack, fetchProjectExports, deleteDBExport } from '../lib/db';
 import { getAudioSignedUrl, getExportSignedUrl } from '../lib/storage';
@@ -268,7 +267,6 @@ export function Studio({ initialFile, initialEngine = 'bars', projectId, persist
   const [activeTab, setActiveTab]     = useState<string>('style');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const { theme, toggle: toggleTheme } = useTheme();
   // Named presets — persisted to localStorage
   type SavedPreset = { name: string; engineId: string; variant: string; palette: number; motion: { beatSensitivity: number; particleDensity: number; smoothing: number; baseSpeed: number; beatResponse: number } };
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(() => {
@@ -1510,7 +1508,7 @@ recorder.start(200);
   // ─────────────────────────────────────────────────────────────────────────
 
  return (
-    <div className="studio-root h-screen flex flex-col bg-gradient-to-b from-black via-gray-950 to-black text-white overflow-hidden">
+    <div className="h-screen flex flex-col bg-gradient-to-b from-black via-gray-950 to-black text-white overflow-hidden">
  
       {/* ── Top bar (fixed height) ──────────────────────────────── */}
       <div className="shrink-0 border-b border-white/10 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-3">
@@ -1541,10 +1539,6 @@ recorder.start(200);
           </div>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <Button variant="ghost" onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light' : 'Switch to dark'}
-            className="border border-white/15 text-gray-300 hover:bg-white/10 shrink-0 h-8 w-8 p-0">
-            {theme === 'dark' ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
-          </Button>
           <Button variant="ghost" onClick={randomize} title="Randomize engine, style & palette"
             className="border border-white/15 text-gray-300 hover:bg-white/10 shrink-0 h-8 w-8 p-0">
             <Shuffle className="size-3.5" />
@@ -1588,7 +1582,7 @@ recorder.start(200);
           {/* Canvas viewport — constrained to available space, never overflows */}
           <div className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden">
           <div
-            className="studio-canvas relative rounded-xl overflow-hidden bg-black border border-white/10 flex-shrink-0"
+            className="relative rounded-xl overflow-hidden bg-black border border-white/10 flex-shrink-0"
             style={{
               // Fit inside available box while preserving aspect ratio
               aspectRatio: aspect === '9:16' ? '9 / 16' : aspect === '1:1' ? '1 / 1' : '16 / 9',
