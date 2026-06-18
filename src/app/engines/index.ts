@@ -274,8 +274,8 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
       cameraTRef.current += (0.004 + bass * 0.01 * sens) * energyMult;
       const orbitOnset = Math.max(0, bass - prevBassRef.current);
       prevBassRef.current = bass;
-      if (orbitOnset > 0.05) smoothedBurstRef.current = Math.min(1, smoothedBurstRef.current + orbitOnset * 2.5);
-      smoothedBurstRef.current *= 0.84;
+      if (orbitOnset > 0.025) smoothedBurstRef.current = Math.min(1, smoothedBurstRef.current + (0.5 + orbitOnset * 3.0));
+      smoothedBurstRef.current *= 0.82;
       const burst = smoothedBurstRef.current;
 
       if (vrnt === 'helix') {
@@ -381,8 +381,9 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
           const bLo = Math.floor(o.band * freq.length * 0.45);
           const bv  = Math.min(1, avg(freq, bLo, bLo + 16) * sens);
 
-          // advance (inner faster; gentle beat swell)
-          o.angle += o.dir * 0.016 * (0.5 + o.speed * 1.1) * (1 + bass * 0.5) * energyMult;
+          // advance — music-driven: slow drift baseline, strong surge on energy/beats
+          const drive = 0.35 + bass * 1.6 + mids * 0.8 + burst * 1.2;   // audio dominates motion
+          o.angle += o.dir * 0.016 * (0.4 + o.speed * 0.8) * drive * energyMult;
 
           // position on tilted, rotated ellipse
           const A = o.a * minDim, B = A * (1 - o.ecc);
@@ -394,9 +395,9 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
           const depth = Math.sin(o.angle);            // +behind / -front
           const depthF = 0.6 - depth * 0.4;           // front brighter/bigger
 
-          // record trail (length driven by band activity)
+          // record trail (length driven by band activity + beats)
           o.trail.push({ x: px, y: py, depth });
-          const maxTrail = Math.floor(14 + bv * 30 + burst * 10);
+          const maxTrail = Math.floor(10 + bv * 40 + burst * 24);
           while (o.trail.length > maxTrail) o.trail.shift();
 
           const col = liveColors[Math.floor(o.hue * liveColors.length) % liveColors.length];
@@ -415,11 +416,11 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
             ctx.stroke();
           }
 
-          // body halo + core
-          const size = (2.4 + bv * 5) * depthF * (1 + burst * 0.3);
+          // body halo + core — pulses clearly with band energy + beats
+          const size = (2.6 + bv * 7) * depthF * (1 + burst * 0.9 + bass * 0.4);
           if (!perf) {
             const g = ctx.createRadialGradient(px, py, 0, px, py, size * 3);
-            g.addColorStop(0, `rgba(${rgbCol},${(0.3 + bv * 0.5) * depthF})`);
+            g.addColorStop(0, `rgba(${rgbCol},${(0.35 + bv * 0.55 + burst * 0.3) * depthF})`);
             g.addColorStop(1, `rgba(${rgbCol},0)`);
             ctx.fillStyle = g;
             ctx.beginPath(); ctx.arc(px, py, size * 3, 0, Math.PI * 2); ctx.fill();
@@ -430,13 +431,13 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
           ctx.beginPath(); ctx.arc(px, py, size * 0.4, 0, Math.PI * 2); ctx.fill();
         }
 
-        // Bright core (front)
-        const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
+        // Bright core (front) — flashes white on beats
+        const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * (1 + burst * 0.5));
         coreGrad.addColorStop(0,   '#ffffff');
-        coreGrad.addColorStop(0.3, `rgba(${hexToRgb(liveColors[0], hxCache)},1)`);
+        coreGrad.addColorStop(0.3, `rgba(${hexToRgb(liveColors[0], hxCache)},${Math.min(1, 0.85 + burst * 0.15)})`);
         coreGrad.addColorStop(1,   'rgba(0,0,0,0)');
         ctx.fillStyle = coreGrad;
-        ctx.beginPath(); ctx.arc(cx, cy, coreR, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, coreR * (1 + burst * 0.5), 0, Math.PI * 2); ctx.fill();
 
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1; ctx.shadowBlur = 0;
@@ -830,12 +831,12 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
       smoothedBurstRef.current *= 0.86;
       const burst = smoothedBurstRef.current;
 
-      tunnelTRef.current += (0.18 + mids * 0.4) * 0.016 * energyMult;
+      tunnelTRef.current += (0.30 + mids * 0.4) * 0.016 * Math.max(0.5, energyMult);
       const t = tunnelTRef.current;
 
       const minDim = Math.min(w, h);
-      const NCURTAIN = perf ? 5 : 7;
-      const SEG = perf ? 14 : 22;
+      const NCURTAIN = perf ? 7 : 11;
+      const SEG = perf ? 16 : 26;
       if (vrnt === 'ribbons') {
         // ── Ribbons: horizontal flowing light bands (variant) ──────────────
         const NRIB = perf ? 5 : 6;
@@ -928,8 +929,9 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
       ctx.fillStyle = `rgba(2,2,10,${0.26 + (1 - sectionIntensity) * 0.06})`;
       ctx.fillRect(0, 0, w, h);
       const sky = ctx.createLinearGradient(0, 0, 0, h);
-      sky.addColorStop(0,   `rgba(${hexToRgb(liveColors[0], hxCache)},${0.03 + energy * 0.03})`);
-      sky.addColorStop(0.5, 'rgba(0,0,0,0)');
+      sky.addColorStop(0,   `rgba(${hexToRgb(liveColors[0], hxCache)},${0.08 + energy * 0.08})`);
+      sky.addColorStop(0.5, `rgba(${hexToRgb(liveColors[2], hxCache)},${0.03 + energy * 0.04})`);
+      sky.addColorStop(1,   'rgba(0,0,0,0)');
       ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
 
       ctx.globalCompositeOperation = 'lighter';
@@ -949,7 +951,7 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
 
         const sway  = Math.sin(c.driftA) * 0.04 * (1 + bass * 0.8) + Math.sin(t * 0.5) * 0.02;
         const cxN   = c.hx + sway;
-        const widthPx = c.hy * w * (0.7 + drive * 0.7 + burst * 0.5);   // flare on beats
+        const widthPx = c.hy * w * (1.4 + drive * 1.0 + burst * 0.6);   // wider, fuller curtains
 
         let prevLX = 0, prevRX = 0, prevY = 0;
         for (let s = 0; s <= SEG; s++) {
@@ -961,7 +963,7 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
           const lx = xPx - wHere * 0.5, rx = xPx + wHere * 0.5;
           const ripple = 0.5 + 0.5 * Math.sin(f * 5.0 - t * 2.2 + c.driftA);
           const vertFade = Math.sin(f * Math.PI);
-          const a = (0.05 + drive * 0.22 + burst * 0.14) * ripple * vertFade;
+          const a = (0.10 + drive * 0.40 + burst * 0.22 + energy * 0.10) * ripple * vertFade;
           const yPx = f * h;
           if (s > 0 && a > 0.004) {
             const g = ctx.createLinearGradient(lx, 0, rx, 0);
@@ -978,8 +980,8 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
         }
 
         // crisp core filament down the curtain
-        ctx.strokeStyle = `rgba(${rgbCol},${0.10 + drive * 0.25})`;
-        ctx.lineWidth = 1.2 + drive * 2;
+        ctx.strokeStyle = `rgba(${rgbCol},${0.20 + drive * 0.45 + burst * 0.2})`;
+        ctx.lineWidth = 1.5 + drive * 3;
         ctx.beginPath();
         for (let s = 0; s <= SEG; s++) {
           const f = s / SEG;
@@ -992,9 +994,9 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
       }
 
       // beat flare across the top
-      if (burst > 0.05) {
+      if (burst > 0.04) {
         const g = ctx.createLinearGradient(0, 0, 0, h * 0.6);
-        g.addColorStop(0, `rgba(${hexToRgb(liveColors[0], hxCache)},${burst * 0.18})`);
+        g.addColorStop(0, `rgba(${hexToRgb(liveColors[0], hxCache)},${burst * 0.30})`);
         g.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = g; ctx.fillRect(0, 0, w, h * 0.6);
       }
@@ -1282,7 +1284,7 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
       // Overlapping waves interfere. Clean rotating polygon core anchors center.
       // Punchy: sharp wavefront, fast settle. No shadowBlur — additive glow.
       const bass = avg(freq, 0, 16), mids = avg(freq, 16, 80), highs = avg(freq, 80, 200);
-      solarTRef.current += (0.4 + bass * 0.6 * sens) * 0.016 * energyMult;
+      solarTRef.current += (0.6 + bass * 0.6 * sens) * 0.016 * Math.max(0.5, energyMult);  // keeps moving when quiet
       const t = solarTRef.current;
       const cx = w / 2, cy = h / 2;
       const minDim = Math.min(w, h);
@@ -1361,8 +1363,12 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
           }
         }
         if (bright > 1.4) bright = 1.4;
-        const shimmer = 0.16 + 0.16 * Math.sin(dot.d * 0.03 - t * 3) * (0.4 + mids);
-        const a = 0.14 + shimmer + bright * 1.1;   // brighter idle grid + punchier lit dots
+        // Ambient life: a slow breathing ripple travels the grid even in silence,
+        // so the engine never looks dead between beats.
+        const ambient = 0.10 + 0.10 * Math.sin(dot.d * 0.025 - t * 1.6)        // travelling ring
+                      + 0.05 * Math.sin(dot.d * 0.06 + t * 0.9);               // counter-wave
+        const shimmer = 0.10 * Math.sin(dot.d * 0.03 - t * 3) * (0.3 + mids);  // music adds on top
+        const a = 0.12 + ambient + shimmer + bright * 1.1;
         const ang = Math.atan2(dot.by - cy, dot.bx - cx);
         dot.x = dot.bx + Math.cos(ang) * push;
         dot.y = dot.by + Math.sin(ang) * push;
@@ -1396,7 +1402,8 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
       }
 
       // ── Geometric core: clean rotating polygon ──────────────────────────
-      const coreR = minDim * 0.05 * (1 + burst * 0.7 + bass * 0.3);
+      const idlePulse = 1 + Math.sin(t * 1.4) * 0.08;   // gentle breathing when quiet
+      const coreR = minDim * 0.05 * idlePulse * (1 + burst * 0.7 + bass * 0.3);
       const sides = 6, rot = t * 0.4 + burst * 0.5;
       const hg = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 4);
       hg.addColorStop(0, `rgba(${hexToRgb(liveColors[0], hxCache)},${0.10 + burst * 0.18})`);
