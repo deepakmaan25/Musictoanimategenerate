@@ -83,13 +83,13 @@ import type { Star as StarParticle, Spark, Sphere, Planet, OrbitBody, GridDot, S
 const ENGINES: { id: EngineId; name: string; description: string; group: '2D' | '3D' }[] = [
   { id: 'bars',        name: 'Spectrum Bars',        description: 'Classic frequency bars across the canvas.',              group: '2D' },
   { id: 'radial',      name: 'Radial Spectrum',       description: 'Bars radiating from the center.',                       group: '2D' },
-  { id: 'orbital',     name: 'Orbital Rings',         description: 'Concentric rings tilt and pulse around a glowing core.', group: '3D' },
+  { id: 'orbital',     name: 'Orbital Rings',         description: 'Luminous bodies orbit a core, leaving comet trails.', group: '3D' },
   { id: 'depth',       name: 'Depth Field Particles', description: 'Cinematic starfield that surges on every beat.',        group: '3D' },
-  { id: 'terrain',     name: 'Audio Terrain',         description: 'Wireframe landscape that reacts to every frequency.',  group: '3D' },
+  { id: 'terrain',     name: 'Audio Terrain',         description: 'A 3D landscape that ripples and rises with your track.',  group: '3D' },
   { id: 'tunnel',      name: 'Liquid Aurora',         description: 'Flowing colour curtains that ripple with every frequency.',  group: '3D' },
-  { id: 'neon_spheres',name: 'Resonance Field',        description: 'Frequency-reactive 3D lattice — strings glow with tension.',  group: '3D' },
-  { id: 'fractal',     name: 'Fractal Kaleidoscope',  description: 'Mirrored tiling pattern; rotation tied to energy.',    group: '3D' },
-  { id: 'solar',       name: 'Geometric Pulse',       description: 'Concentric beat rings expand and shatter on every drop.', group: '3D' },
+  { id: 'neon_spheres',name: 'Resonance Field',        description: 'Drifting particles connect into a living constellation.',  group: '3D' },
+  { id: 'fractal',     name: 'Fractal Kaleidoscope',  description: 'True mirror-kaleidoscope symmetry that blooms with the music.',    group: '3D' },
+  { id: 'solar',       name: 'Geometric Pulse',       description: 'A dot grid that beats ripple through as shockwaves.', group: '3D' },
 ];
 
 // ── Short engine name lookup for preset naming ─────────────────────────────
@@ -161,7 +161,6 @@ const VARIANTS: Partial<Record<EngineId, { id: string; label: string; descriptio
     { id: 'wireframe', label: 'Wireframe', description: 'Mesh grid lines (default)' },
     { id: 'solid',     label: 'Solid',     description: 'Filled terrain with coloured horizon' },
     { id: 'grid',      label: 'Grid',      description: 'Top-down frequency grid — cells pulse per band' },
-    { id: 'ocean',     label: 'Ocean',     description: 'Rolling fluid waves — amplitude tied to bass' },
   ],
   neon_spheres: [
     { id: 'constellation', label: 'Constellation', description: 'Particles drift freely, connecting into a living web (default)' },
@@ -2006,11 +2005,11 @@ recorder.start(200);
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
             <TabsList className="grid grid-cols-5 w-full bg-white/5 rounded-none border-b border-white/10 shrink-0 h-10
                                   sticky top-0 z-10 lg:relative lg:top-auto backdrop-blur-sm">
-              <TabsTrigger value="style"   className="text-[10px] sm:text-xs">Style</TabsTrigger>
-              <TabsTrigger value="motion"  className="text-[10px] sm:text-xs">Motion</TabsTrigger>
-              <TabsTrigger value="color"   className="text-[10px] sm:text-xs">Color</TabsTrigger>
-              <TabsTrigger value="export"  className="text-[10px] sm:text-xs">Export</TabsTrigger>
-              <TabsTrigger value="exports" className="text-[10px] sm:text-xs">History</TabsTrigger>
+              <TabsTrigger value="style"   className="text-[10px] sm:text-xs !text-gray-400 data-[state=active]:!text-white data-[state=active]:!bg-white/15 !border-transparent">Style</TabsTrigger>
+              <TabsTrigger value="motion"  className="text-[10px] sm:text-xs !text-gray-400 data-[state=active]:!text-white data-[state=active]:!bg-white/15 !border-transparent">Motion</TabsTrigger>
+              <TabsTrigger value="color"   className="text-[10px] sm:text-xs !text-gray-400 data-[state=active]:!text-white data-[state=active]:!bg-white/15 !border-transparent">Color</TabsTrigger>
+              <TabsTrigger value="export"  className="text-[10px] sm:text-xs !text-gray-400 data-[state=active]:!text-white data-[state=active]:!bg-white/15 !border-transparent">Export</TabsTrigger>
+              <TabsTrigger value="exports" className="text-[10px] sm:text-xs !text-gray-400 data-[state=active]:!text-white data-[state=active]:!bg-white/15 !border-transparent">History</TabsTrigger>
             </TabsList>
 
             {/* Session expiry banner — shown when autosave silently failed */}
