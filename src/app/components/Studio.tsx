@@ -1544,8 +1544,8 @@ recorder.start(200);
             className="border border-white/15 text-gray-300 hover:bg-white/10 shrink-0 h-8 w-8 p-0">
             <Shuffle className="size-3.5" />
           </Button>
-          <Button variant="outline" onClick={onPickFile}
-            className="border-white/20 text-white hover:bg-white/10 shrink-0 h-8 w-8 sm:w-auto sm:px-3 text-xs p-0 sm:p-auto">
+          <Button variant="ghost" onClick={onPickFile}
+            className="border border-white/15 text-gray-200 hover:bg-white/10 shrink-0 h-8 w-8 sm:w-auto sm:px-3 text-xs p-0 sm:p-auto">
             <Upload className="size-3.5 sm:mr-1.5" />
             <span className="hidden sm:inline">Replace</span>
           </Button>
