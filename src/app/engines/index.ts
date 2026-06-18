@@ -781,65 +781,6 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
           ctx.fillStyle = `rgba(${hexToRgb(liveColors[0], hxCache)}, ${elevBurst * 0.08})`;
           ctx.fillRect(0, 0, w, h);
         }
-      } else if (vrnt === 'ocean') {
-        // ── Ocean: rolling fluid sine-wave surface from a side view ──────
-        const waveRows   = perf ? 6 : 13;
-        const waveSteps  = perf ? 60 : 140;
-        cameraTRef.current += (0.018 + bass * 0.028 * sens) * energyMult;
-        const ot = cameraTRef.current;
-
-        // Draw back-to-front so nearer rows paint over distant ones
-        for (let r = 0; r < waveRows; r++) {
-          const t2      = r / waveRows;
-          const depth   = 1 - t2;                          // 1 = far, 0 = near
-          const yBase   = h * (0.28 + t2 * 0.55);         // rows spread across lower 3/4
-          const freqLo  = Math.floor(t2 * freq.length * 0.45);
-          const bandV   = avg(freq, freqLo, freqLo + 14);
-          const color   = liveColors[r % liveColors.length];
-
-          // Wave amplitude driven by bass + band value
-          const amp = (28 + bandV * 110 * sens + bass * 60 * sens * sectionIntensity)
-                      * (0.35 + t2 * 0.65) * energyMult;
-          const waveFreq  = 2.2 + r * 0.55;
-          const waveSpeed = ot * (0.9 + r * 0.25);
-
-          // Build wave polygon (top edge + flat bottom)
-          ctx.beginPath();
-          const pts: [number, number][] = [];
-          for (let s = 0; s <= waveSteps; s++) {
-            const x = (s / waveSteps) * w;
-            const phase1 = (s / waveSteps) * Math.PI * 2 * waveFreq + waveSpeed;
-            const phase2 = (s / waveSteps) * Math.PI * 2 * (waveFreq * 0.5) + waveSpeed * 1.4;
-            const y = yBase
-              - Math.sin(phase1) * amp
-              - Math.sin(phase2) * amp * 0.38
-              - elevBurst * 55 * (0.3 + t2 * 0.7);        // beat surge lifts all rows
-            pts.push([x, y]);
-          }
-          // Polygon: top wave + bottom fill
-          ctx.moveTo(pts[0][0], pts[0][1]);
-          pts.forEach(([x, y]) => ctx.lineTo(x, y));
-          ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
-
-          // Gradient fill from wave-top to ocean floor
-          const wGrad = ctx.createLinearGradient(0, yBase - amp, 0, h);
-          wGrad.addColorStop(0,   `rgba(${hexToRgb(color, hxCache)}, ${(0.25 + bandV * 0.35) * (0.4 + sectionIntensity * 0.6)})`);
-          wGrad.addColorStop(0.5, `rgba(${hexToRgb(color, hxCache)}, ${0.08 * depth})`);
-          wGrad.addColorStop(1,   'rgba(0,0,0,0)');
-          ctx.fillStyle   = wGrad;
-          ctx.globalAlpha = 0.55 + depth * 0.45;
-          ctx.fill();
-
-          // Bright foam edge
-          ctx.beginPath();
-          pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
-          ctx.strokeStyle = color;
-          ctx.lineWidth   = 1.2 + bandV * 4.5 * (0.5 + sectionIntensity * 0.5);
-          ctx.globalAlpha = 0.45 + bandV * 0.55;
-          ctx.shadowColor = color; ctx.shadowBlur = 8 + bandV * 22;
-          ctx.stroke();
-        }
-        ctx.globalAlpha = 1; ctx.shadowBlur = 0;
       } else {
         // ── Wireframe (default): mesh grid lines ─────────────────────────
         for (let r = 0; r < rows; r++) {
@@ -1350,8 +1291,8 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
 
       const geoOnset = Math.max(0, bass - prevBassRef.current);
       prevBassRef.current = bass;
-      if (geoOnset > 0.05) smoothedBurstRef.current = Math.min(1, smoothedBurstRef.current + (0.6 + geoOnset * 2.0));
-      smoothedBurstRef.current *= 0.84;                       // punchy decay
+      if (geoOnset > 0.025) smoothedBurstRef.current = Math.min(1, smoothedBurstRef.current + (0.85 + geoOnset * 2.6));
+      smoothedBurstRef.current *= 0.80;                       // snappier, punchier decay
       const burst = smoothedBurstRef.current;
 
       // ── Lazy-build dot grid (rebuilds if size/topology changes) ─────────
@@ -1383,11 +1324,11 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
       const dots = gridDotsRef.current;
 
       // ── Spawn shockwave on beat ─────────────────────────────────────────
-      if (geoOnset > 0.05) {
-        const strength = Math.min(1, 0.6 + geoOnset * 1.6);
+      if (geoOnset > 0.025) {
+        const strength = Math.min(1, 0.75 + geoOnset * 2.0);
         shockwavesRef.current.push({
           r: minDim * 0.02, maxR: minDim * 0.85,
-          speed: minDim * (0.012 + strength * 0.010), width: spacing * 1.8,
+          speed: minDim * (0.013 + strength * 0.011), width: spacing * 2.4,
           strength, colorIdx: Math.floor(Math.random() * liveColors.length),
         });
         if (shockwavesRef.current.length > 10) shockwavesRef.current.shift();
@@ -1420,8 +1361,8 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
           }
         }
         if (bright > 1.4) bright = 1.4;
-        const shimmer = 0.10 + 0.10 * Math.sin(dot.d * 0.03 - t * 3) * mids;
-        const a = 0.06 + shimmer + bright * 0.9;
+        const shimmer = 0.16 + 0.16 * Math.sin(dot.d * 0.03 - t * 3) * (0.4 + mids);
+        const a = 0.14 + shimmer + bright * 1.1;   // brighter idle grid + punchier lit dots
         const ang = Math.atan2(dot.by - cy, dot.bx - cx);
         dot.x = dot.bx + Math.cos(ang) * push;
         dot.y = dot.by + Math.sin(ang) * push;
@@ -1429,18 +1370,18 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
         if (a <= 0.02) continue;
         const col = liveColors[Math.floor(dot.d / spacing) % liveColors.length];
         const rgbCol = hexToRgb(col, hxCache);
-        const size = 1.3 + bright * 3.2 + (bright > 0.5 ? bright * 1.5 : 0);
-        if (bright > 0.12 && !perf) {
-          const g = ctx.createRadialGradient(dot.x, dot.y, 0, dot.x, dot.y, size * 3.2);
-          g.addColorStop(0, `rgba(${rgbCol},${bright * 0.5})`);
+        const size = 2.0 + bright * 4.0 + (bright > 0.5 ? bright * 1.8 : 0);
+        if (bright > 0.08 && !perf) {
+          const g = ctx.createRadialGradient(dot.x, dot.y, 0, dot.x, dot.y, size * 3.4);
+          g.addColorStop(0, `rgba(${rgbCol},${bright * 0.65})`);
           g.addColorStop(1, `rgba(${rgbCol},0)`);
           ctx.fillStyle = g;
-          ctx.beginPath(); ctx.arc(dot.x, dot.y, size * 3.2, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(dot.x, dot.y, size * 3.4, 0, Math.PI * 2); ctx.fill();
         }
         ctx.fillStyle = `rgba(${rgbCol},${a})`;
         ctx.beginPath(); ctx.arc(dot.x, dot.y, size, 0, Math.PI * 2); ctx.fill();
-        if (bright > 0.6) {
-          ctx.fillStyle = `rgba(255,255,255,${(bright - 0.6) * 0.9})`;
+        if (bright > 0.45) {
+          ctx.fillStyle = `rgba(255,255,255,${(bright - 0.45) * 1.0})`;
           ctx.beginPath(); ctx.arc(dot.x, dot.y, size * 0.5, 0, Math.PI * 2); ctx.fill();
         }
       }
@@ -1449,8 +1390,8 @@ export function drawEngine(eng: string, fc: EngineFrameCtx): void {
       for (let wi = 0; wi < waves.length; wi++) {
         const wv = waves[wi];
         const col = liveColors[wv.colorIdx % liveColors.length];
-        ctx.strokeStyle = `rgba(${hexToRgb(col, hxCache)},${wv.strength * 0.5})`;
-        ctx.lineWidth = 1 + wv.strength * 2.5;
+        ctx.strokeStyle = `rgba(${hexToRgb(col, hxCache)},${wv.strength * 0.7})`;
+        ctx.lineWidth = 1.5 + wv.strength * 3.5;
         ctx.beginPath(); ctx.arc(cx, cy, wv.r, 0, Math.PI * 2); ctx.stroke();
       }
 
